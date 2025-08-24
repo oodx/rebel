@@ -133,7 +133,9 @@ macro_rules! job {
     (wait: $job_id:expr) => {{
         let job_arc = $crate::os::JOBS.lock().unwrap().remove(&$job_id);
         if let Some(job_mutex) = job_arc {
-            // This is a simplification. A real implementation would need to handle the JoinHandle correctly.
+
+            let job = job_mutex.lock().unwrap();
+
             $crate::info!("[{}] Waiting for job to complete...", $job_id);
             -1
         } else {
@@ -191,6 +193,7 @@ macro_rules! trap {
     (on_command_start $handler:expr) => { $crate::event!(register "command_start", $handler); };
 }
 
+
 // --- Loop Macros ---
 
 /// A macro for shell-style `for in` loops over RSB arrays.
@@ -236,6 +239,7 @@ macro_rules! test {
     ($a:expr, -le, $b:expr) => { $crate::utils::num_lt($a, $b) || $crate::utils::num_eq($a, $b) };
     ($a:expr, -gt, $b:expr) => { $crate::utils::num_gt($a, $b) };
     ($a:expr, -ge, $b:expr) => { $crate::utils::num_gt($a, $b) || $crate::utils::num_eq($a, $b) };
+
 }
 #[macro_export]
 macro_rules! case {
@@ -253,6 +257,7 @@ macro_rules! case {
         }
     };
 }
+
 
 // --- User Interaction Macros ---
 
@@ -329,6 +334,7 @@ macro_rules! backup {
         $crate::fs::backup_file($path, $suffix).ok()
     };
 }
+
 
 
 // --- Meta & Path Macros ---
@@ -474,6 +480,7 @@ macro_rules! param {
         let val = $crate::context::get_var($var);
         if val.is_empty() { String::new() } else { $alt.to_string() }
     }};
+
     ($var:expr, sub: $start:expr) => { $crate::utils::str_sub(&$crate::context::get_var($var), $start, None) };
     ($var:expr, sub: $start:expr, $len:expr) => { $crate::utils::str_sub(&$crate::context::get_var($var), $start, Some($len)) };
     ($var:expr, prefix: $pattern:expr) => { $crate::utils::str_prefix(&$crate::context::get_var($var), $pattern, false) };
@@ -486,6 +493,7 @@ macro_rules! param {
     ($var:expr, lower) => { $crate::utils::str_lower(&$crate::context::get_var($var), true) };
     ($var:expr, upper: first) => { $crate::utils::str_upper(&$crate::context::get_var($var), false) };
     ($var:expr, lower: first) => { $crate::utils::str_lower(&$crate::context::get_var($var), false) };
+
     ($var:expr, len) => { $crate::context::get_var($var).len() };
 }
 
@@ -502,6 +510,10 @@ macro_rules! benchmark {
         }
     };
 }
+
+// --- Date/Time Macros ---
+
+
 #[macro_export]
 macro_rules! date {
     () => {

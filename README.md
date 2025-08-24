@@ -106,6 +106,7 @@ $ cargo run -- hello RSB
 
 ## API Reference
 
+
 ### Core & Bootstrap
 
 - **`bootstrap!() -> Vec<String>`**: Initializes the RSB environment (loads env vars, sets up paths) and returns the command-line arguments. The one-stop-shop for starting your script.
@@ -115,22 +116,28 @@ $ cargo run -- hello RSB
 
 ### Logging & Output
 
-- **`info!(...)`**: For general informational messages.
-- **`okay!(...)`**: For success messages.
-- **`warn!(...)`**: For warnings.
-- **`error!(...)`**: For non-fatal errors.
+All logging macros print to `stderr` and support standard Rust formatting.
+
+- **`info!(...)`**: For general informational messages (cyan ℹ).
+- **`okay!(...)`**: For success messages (green ✓).
+- **`warn!(...)`**: For warnings (yellow ⚠).
+- **`error!(...)`**: For non-fatal errors (red ✗).
+- **`fatal!(...)`**: For fatal errors (red 💀).
+- **`debug!(...)`**: For debug messages (grey 🔍).
+- **`trace!(...)`**: For trace-level messages (magenta 👁).
 - **`echo!(...)`**: Prints to `stdout`. Use this for output that needs to be piped or captured.
 - **`printf!(...)`**: Like `echo!` but without a trailing newline.
-- **`line!('-', 20)`**: Creates a string by repeating a character.
-- **`clear!()`**: Clears the terminal screen.
 
 ### Variable & Config Management
 
-- **`set_var(key, value)` / `get_var(key)`**: Get or set variables in the global context.
+- **`set_var(key, value)`**: Sets a variable in the global context.
+- **`get_var(key) -> String`**: Gets a variable from the context.
+
 - **`param!(...)`**: A powerful macro for bash-style parameter expansion (e.g., `param!("VAR", default: "val")`, `param!("VAR", suffix: ".txt")`).
 - **`src!(path, ...)` / `load_config!(path, ...)`**: Loads variables from one or more configuration files.
 - **`export!(path)`**: Saves all context variables to a file in `export` format.
 - **`meta_keys!(path, into: "META")`**: Parses `# key: value` comments from a file and loads them into an associative array named `META`.
+
 
 ### Array Utilities
 - **`set_array(name, &["a", "b"])`**: Creates an array variable.
@@ -142,6 +149,24 @@ $ cargo run -- hello RSB
 
 - **Sources**: `cat!(path)`, `cmd!(command)`, `pipe!(string)`, `stream!(array: &vec)`.
 - **Methods**: `.grep()`, `.sed()`, `.cut()`, `.sort()`, `.unique()`, `.tee(path)`, `.to_file(path)`, `.each(|line| ...)`
+
+### Stream Processing (`cat!`, `cmd!`, `pipe!`)
+
+Create a `Stream` and chain methods to process data.
+
+```rust
+let unique_lines = cat!("file.txt")
+    .grep("some_pattern")
+    .sed("old", "new")
+    .cut(2, ",")
+    .sort()
+    .unique()
+    .to_string();
+```
+
+- **Sources**: `cat!(path)`, `cmd!(command)`, `pipe!(string)`
+- **Sinks**: `.to_string()`, `.to_vec()`, `.to_file(path)`, `.tee(path)`, `.each(|line| ...)`
+
 
 ### Conditional Logic
 
@@ -155,5 +180,12 @@ $ cargo run -- hello RSB
 - **`date!(iso)` / `date!(epoch)` / `date!("%Y-%m-%d")`**: Gets the current time in various formats.
 - **`benchmark!({ ... })`**: Measures the execution time of a code block.
 - **`trap!(|| ..., on: "SIGINT")`**: Traps OS signals and other custom events.
+
+- **`require_dir!(path)`**: Exits if the directory does not exist.
+- **`require_command!(cmd)`**: Exits if the command is not in the `PATH`.
+- **`require_var!(name)`**: Exits if the variable is not set.
+- **`test!(...)`**: A comprehensive macro for bash-style tests (e.g., `test!(-f "file")`, `test!(var -gt 10)`).
+- **`case!(value, { ... })`**: A shell-style `case` statement with regex pattern matching.
+
 
 Welcome to a more rebellious, productive way of writing scripts in Rust.
