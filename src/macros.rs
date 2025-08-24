@@ -7,6 +7,11 @@ macro_rules! bootstrap {
         let args: Vec<String> = std::env::args().collect();
         $crate::get_env!();
         $crate::context::rsb_bootstrap(&args);
+        // Register a trap to clean up temp files on exit.
+        // The handler needs to match the signature `Fn(&EventData)`.
+        $crate::trap!(|_: &$crate::os::EventData| {
+            $crate::fs::cleanup_temp_files();
+        }, on: "EXIT");
         args
     }};
 }
@@ -91,9 +96,16 @@ macro_rules! stream {
 #[macro_export]
 macro_rules! shell {
     ($($arg:tt)*) => {
-        match $crate::os::shell_exec(&format!($($arg)*), false) {
-            Ok(output) => output,
-            Err(e) => { $crate::fatal!("Shell command failed: {}", e); std::process::exit(1); }
+        {
+            let cmd_str = format!($($arg)*);
+            match $crate::os::shell_exec(&cmd_str, false) {
+                Ok(output) => output,
+                Err(res) => {
+                    $crate::event!(emit "COMMAND_ERROR", "source" => "shell!", "command" => &cmd_str, "status" => &res.status.to_string(), "stderr" => &res.error);
+                    $crate::fatal!("Shell command failed: {}", cmd_str);
+                    std::process::exit(res.status);
+                }
+            }
         }
     };
     ($($arg:tt)*, silent) => {
@@ -189,7 +201,7 @@ macro_rules! trap {
     ($handler:expr, on: $signal:expr) => {{
         let sig_name = $signal.to_uppercase();
         match sig_name.as_str() {
-            "SIGINT" | "SIGTERM" | "EXIT" => {
+            "SIGINT" | "SIGTERM" | "EXIT" | "COMMAND_ERROR" => {
                 $crate::os::install_signal_handlers();
                 $crate::event!(register &sig_name, $handler);
             }
@@ -325,6 +337,102 @@ macro_rules! str_line {
 macro_rules! meta_key {
     ($path:expr, $key:expr) => {
         $crate::fs::extract_meta_from_file($path).get($key).cloned().unwrap_or_default()
+    };
+}
+
+// --- Math Macros ---
+#[macro_export]
+macro_rules! math {
+    ($expr:expr) => {
+        match $crate::math::evaluate_expression($expr) {
+            Ok(_) => {},
+            Err(e) => {
+                $crate::error!("Math expression failed: {}", e);
+            }
+        }
+    };
+}
+
+// --- Dictionary Macros ---
+#[macro_export]
+macro_rules! dict {
+    ($path:expr) => {
+        $crate::fs::load_dict_from_file($path)
+    };
+}
+
+#[macro_export]
+macro_rules! rand_dict {
+    ($arr_name:expr) => {
+        $crate::random::get_rand_from_slice(&$crate::utils::get_array($arr_name)).unwrap_or_default()
+    };
+    ($arr_name:expr, $n:expr) => {
+        $crate::rand_dict!($arr_name, $n, " ")
+    };
+    ($arr_name:expr, $n:expr, $delim:expr) => {{
+        let words = $crate::utils::get_array($arr_name);
+        if words.is_empty() {
+            String::new()
+        } else {
+            let mut result = Vec::new();
+            for _ in 0..$n {
+                result.push($crate::random::get_rand_from_slice(&words).unwrap_or_default());
+            }
+            result.join($delim)
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! gen_dict {
+    ($type:ident, $n:expr, into: $arr_name:expr) => {{
+        let mut words = Vec::new();
+        for _ in 0..$n {
+            // A bit of a hack to generate a random word length between 4 and 8
+            let len = $crate::rand_range!(4, 8);
+            let word = match stringify!($type) {
+                "alnum" => $crate::random::get_rand_alnum(len),
+                "alpha" => $crate::random::get_rand_alpha(len),
+                "hex" => $crate::random::get_rand_hex(len),
+                "string" => $crate::random::get_rand_string(len),
+                _ => String::new(),
+            };
+            words.push(word);
+        }
+        let word_strs: Vec<&str> = words.iter().map(|s| s.as_str()).collect();
+        $crate::utils::set_array($arr_name, &word_strs);
+    }};
+}
+
+// --- Random Data Macros ---
+#[macro_export]
+macro_rules! rand_alnum {
+    ($n:expr) => {
+        $crate::random::get_rand_alnum($n)
+    };
+}
+#[macro_export]
+macro_rules! rand_alpha {
+    ($n:expr) => {
+        $crate::random::get_rand_alpha($n)
+    };
+}
+#[macro_export]
+macro_rules! rand_hex {
+    ($n:expr) => {
+        $crate::random::get_rand_hex($n)
+    };
+}
+#[macro_export]
+macro_rules! rand_string {
+    ($n:expr) => {
+        $crate::random::get_rand_string($n)
+    };
+}
+#[macro_export]
+macro_rules! rand_uuid {
+    () => {
+        $crate::random::get_rand_uuid()
     };
 }
 #[macro_export]
@@ -513,6 +621,43 @@ macro_rules! date {
     };
 }
 
+// --- Process Substitution ---
+#[macro_export]
+macro_rules! cap_stream {
+    ($stream:expr) => {
+        $crate::fs::capture_stream_to_temp_file(&mut $stream)
+    };
+}
+#[macro_export]
+macro_rules! subst {
+    ($stream:expr) => {
+        $crate::cap_stream!($stream)
+    };
+}
+
+// --- File System & Temp Macros ---
+#[macro_export]
+macro_rules! chmod {
+    ($path:expr, $mode:expr) => {
+        $crate::fs::chmod($path, $mode).ok()
+    };
+}
+#[macro_export]
+macro_rules! backup {
+    ($path:expr, $suffix:expr) => {
+        $crate::fs::backup_file($path, $suffix).ok()
+    };
+}
+#[macro_export]
+macro_rules! tmp {
+    () => {
+        $crate::fs::create_temp_file_path("random")
+    };
+    ($type:ident) => {
+        $crate::fs::create_temp_file_path(stringify!($type))
+    };
+}
+
 // --- String Utilities ---
 #[macro_export]
 macro_rules! str_in {
@@ -541,5 +686,3 @@ macro_rules! str_len {
         $crate::context::get_var($var).len()
     };
 }
-
-

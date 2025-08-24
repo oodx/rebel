@@ -88,7 +88,7 @@ fn test_sed_block() {
 fn test_color_config() {
     let mut cmd = get_example_cmd();
     // Override the color for 'error' and the glyph for 'warn'
-    cmd.env("RSB_COLORS", "error:[magenta],warn:[,>>]");
+    cmd.env("RSB_COLORS", "error:magenta,warn:;>>");
     cmd.env("DEBUG", "1"); // Ensure all levels are printed
     cmd.arg("color-test");
 
@@ -96,4 +96,53 @@ fn test_color_config() {
         .success()
         .stderr(predicate::str::contains("\x1b[35m")) // Check for magenta color code for error
         .stderr(predicate::str::contains(">> This is a warning message.")); // Check for new warn glyph
+}
+
+#[test]
+fn test_math_macro() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("math-test");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("C = 26.25"))
+        .stdout(predicate::str::contains("C += 1.75 -> 28"));
+}
+
+#[test]
+fn test_cap_stream_macro() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("cap-stream-test");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Temp file exists."));
+}
+
+#[test]
+fn test_trap_on_err() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("trap-test");
+    cmd.assert()
+        .success()
+        .stderr(predicate::str::contains("ERROR TRAP: Command 'shell!' failed with status"))
+        .stdout(predicate::str::contains("Final error count: 1"));
+}
+
+#[test]
+fn test_random_macros() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("random-test");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("rand_alnum:").and(predicate::str::len(10 + "rand_alnum: ".len())))
+        .stdout(predicate::str::contains("rand_uuid:").and(predicate::str::len(36 + "rand_uuid: ".len())));
+}
+
+#[test]
+fn test_dict_macros() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("dict-test");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Random word:"))
+        .stdout(predicate::str::contains("Generated words:"));
 }
