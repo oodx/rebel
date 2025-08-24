@@ -1,6 +1,12 @@
 // src/fs.rs
 use crate::context::expand_vars;
 use std::path::Path;
+use std::sync::Mutex;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref TEMP_FILES_TO_CLEAN: Mutex<Vec<String>> = Mutex::new(Vec::new());
+}
 
 // This module will contain file system operations like read_file,
 // write_file, mkdir_p, rm_rf, etc.
@@ -319,4 +325,45 @@ pub fn is_nonempty_file(path: &str) -> bool {
     std::fs::metadata(&expand_vars(path))
         .map(|m| m.is_file() && m.len() > 0)
         .unwrap_or(false)
+}
+
+/// Reads a file and splits it into a vector of words by whitespace.
+pub fn load_dict_from_file(path: &str) -> Vec<String> {
+    let content = read_file(path);
+    content.split_whitespace().map(|s| s.to_string()).collect()
+}
+
+/// Generates a path for a new temporary file in the RSB temp directory.
+pub fn create_temp_file_path(name_type: &str) -> String {
+    let tmp_dir = crate::context::get_var("XDG_TMP");
+    let _ = std::fs::create_dir_all(&tmp_dir); // Ensure the directory exists
+
+    let filename = match name_type {
+        "pid" => format!("{}.tmp", std::process::id()),
+        "timestamp" => format!("{}.tmp", chrono::Utc::now().timestamp_millis()),
+        "random" | _ => format!("{}.tmp", crate::random::get_rand_alnum(8)),
+    };
+
+    let mut path = std::path::PathBuf::from(tmp_dir);
+    path.push(filename);
+    path.to_string_lossy().to_string()
+}
+
+/// Captures a stream to a temporary file and returns the path.
+/// The file is registered for cleanup on script exit.
+pub fn capture_stream_to_temp_file(stream: &mut crate::streams::Stream) -> String {
+    let path = create_temp_file_path("random");
+    stream.clone().to_file(&path);
+    TEMP_FILES_TO_CLEAN.lock().unwrap().push(path.clone());
+    path
+}
+
+/// Cleans up all temporary files created during the script's execution.
+/// This is intended to be called from an EXIT trap.
+pub fn cleanup_temp_files() {
+    if let Ok(files) = TEMP_FILES_TO_CLEAN.lock() {
+        for file in files.iter() {
+            let _ = std::fs::remove_file(file);
+        }
+    }
 }

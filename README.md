@@ -32,8 +32,9 @@ RSB's design is heavily inspired by the mature **BashFX architecture**, incorpor
 - **Integrated Argument Parsing:** A simple yet powerful argument parser built-in.
 - **Config File Loading:** Easily load `.env` or `.conf` style configuration files.
 - **Colorized Output:** Built-in, configurable, and beautiful terminal output with colors and glyphs.
-- **Job Control:** Run and manage background tasks.
-- **Event System:** A flexible `trap!` system for handling OS signals and custom events.
+- **Job Control:** Run and manage background tasks with timeout support.
+- **Event System:** A flexible `trap!` system for handling OS signals, script exit, and command errors.
+- **Advanced String & Math Utilities**: Built-in random data generation and floating-point math.
 
 ## Getting Started
 
@@ -116,7 +117,6 @@ $ cargo run -- hello RSB
 
 ### Logging & Output
 
-
 - **`info!(...)`**: For general informational messages.
 - **`okay!(...)`**: For success messages.
 - **`warn!(...)`**: For warnings.
@@ -132,63 +132,56 @@ $ cargo run -- hello RSB
 ### Variable & Config Management
 
 - **`set_var(key, value)` / `get_var(key)`**: Get or set variables in the global context.
-
 - **`param!(...)`**: A powerful macro for bash-style parameter expansion (e.g., `param!("VAR", default: "val")`, `param!("VAR", suffix: ".txt")`).
 - **`src!(path, ...)` / `load_config!(path, ...)`**: Loads variables from one or more configuration files.
 - **`export!(path)`**: Saves all context variables to a file in `export` format.
 - **`meta_key!(path, key)`**: Extracts a single metadata value from a file's header comments.
 - **`meta_keys!(path, into: "META")`**: Parses `# key: value` comments from a file and loads them into an associative array named `META`.
 
-
-### Array Utilities
+### Array & Dictionary Utilities
 - **`set_array(name, &["a", "b"])`**: Creates an array variable.
 - **`get_array(name) -> Vec<String>`**: Retrieves an array.
 - **`array_push(name, item)`**: Appends an item to an array.
 - **`for_in!(item in "ARRAY_NAME" => { ... })`**: Iterates over an RSB array.
+- **`dict!(path)`**: Reads a whitespace-delimited file into a `Vec<String>`.
+- **`gen_dict!(type, n, into: array_name)`**: Generates an array of `n` random "words" of a given `type` (`alnum`, `hex`, etc.).
+- **`rand_dict!(array_name)`**: Returns a single random word from an array.
 
 ### Stream Processing
-
 - **Sources**: `cat!(path)`, `cmd!(command)`, `pipe!(string)`, `stream!(array: &vec)`.
 - **Methods**: `.grep()`, `.sed()`, `.cut()`, `.sort()`, `.unique()`, `.tee(path)`, `.to_file(path)`, `.each(|line| ...)`
-
-### Stream Processing (`cat!`, `cmd!`, `pipe!`)
-
-Create a `Stream` and chain methods to process data.
-
-```rust
-let unique_lines = cat!("file.txt")
-    .grep("some_pattern")
-    .sed("old", "new")
-    .cut(2, ",")
-    .sort()
-    .unique()
-    .to_string();
-```
-
-- **Sources**: `cat!(path)`, `cmd!(command)`, `pipe!(string)`
-- **Sinks**: `.to_string()`, `.to_vec()`, `.to_file(path)`, `.tee(path)`, `.each(|line| ...)`
-
+- **`sed_block!(start, end, sed_expr)`**: Applies a `sed`-style substitution to a block of text between two patterns.
+- **`cap_stream!(stream)` / `subst!(stream)`**: Captures a stream's output to a temporary file and returns the path. Useful for commands that require file paths instead of stdin (e.g., `diff`).
 
 ### Conditional Logic
-
 - **`validate!(condition, message)`**: Exits with an error if the condition is false.
 - **`require_file!(path)`**: Exits if the file does not exist.
 - **`test!(...)`**: A comprehensive macro for bash-style tests (e.g., `test!(-f "file")`, `test!(var -gt 10)`).
 - **`case!(value, { ... })`**: A shell-style `case` statement with regex pattern matching.
 
-### System & Time
+### System, Time & Math
 - **`sleep!(1)` / `sleep!(ms: 100)`**: Pauses execution.
 - **`date!(iso)` / `date!(epoch)` / `date!("%Y-%m-%d")`**: Gets the current time in various formats.
 - **`benchmark!({ ... })`**: Measures the execution time of a code block.
-- **`trap!(|| ..., on: "SIGINT")`**: Traps OS signals and other custom events.
+- **`math!("VAR = (A + B) * 2")`**: Evaluates a mathematical expression (with float support) and assigns the result to a variable.
+- **`tmp!()` / `tmp!(pid)`**: Generates a temporary file path.
 
+### Job Control
+- **`job!(background: "...")`**: Runs a command in the background and returns a job ID.
+- **`job!(wait: id)`**: Waits for a background job to complete.
+- **`job!(timeout: 10, wait: id)`**: Waits for a background job with a timeout in seconds.
+- **`job!(list)`**: Lists running background jobs.
 
-- **`require_dir!(path)`**: Exits if the directory does not exist.
-- **`require_command!(cmd)`**: Exits if the command is not in the `PATH`.
-- **`require_var!(name)`**: Exits if the variable is not set.
-- **`test!(...)`**: A comprehensive macro for bash-style tests (e.g., `test!(-f "file")`, `test!(var -gt 10)`).
-- **`case!(value, { ... })`**: A shell-style `case` statement with regex pattern matching.
+### Event Handling
+- **`trap!(|| ..., on: "SIGINT")`**: Traps OS signals.
+- **`trap!(|| ..., on: "EXIT")`**: Executes a handler when the script exits.
+- **`trap!(|data| ..., on: "COMMAND_ERROR")`**: Executes a handler when `cmd!` or `shell!` fails. The `data` argument contains `source`, `command`, `status`, and `stderr`.
 
-
+### Random Data Generation
+- **`rand_alnum!(n)`**: Generates `n` random alphanumeric characters.
+- **`rand_alpha!(n)`**: Generates `n` random alphabetic characters.
+- **`rand_hex!(n)`**: Generates `n` random hex characters.
+- **`rand_string!(n)`**: Generates `n` random printable characters.
+- **`rand_uuid!()`**: Generates a v4 UUID.
 
 Welcome to a more rebellious, productive way of writing scripts in Rust.

@@ -10,3 +10,5 @@ pub mod prelude;
 pub mod streams;
 pub mod time;
 pub mod utils;
+pub mod random;
+pub mod math;
