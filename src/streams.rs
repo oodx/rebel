@@ -58,6 +58,7 @@ impl Stream {
         Self::from_string(&content)
     }
 
+
     /// Creates a stream from a vector of strings.
     pub fn from_vec(lines: &[String]) -> Self {
         Stream {
@@ -71,6 +72,7 @@ impl Stream {
             lines: content.split(delimiter).map(|s| s.to_string()).collect(),
         }
     }
+
 
     // --- Chainable Operations ---
 
@@ -149,6 +151,7 @@ impl Stream {
         self
     }
 
+
     /// Replaces a block of text between two patterns.
     pub fn sed_block(mut self, start_pattern: &str, end_pattern: &str, replacement: &str) -> Self {
         let mut result_lines = Vec::new();
@@ -181,6 +184,7 @@ impl Stream {
         self.lines = result_lines;
         self
     }
+
 
     /// Pipes the stream's content as stdin to another shell command.
     pub fn pipe_to_cmd(self, command: &str) -> Self {

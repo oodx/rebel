@@ -133,7 +133,7 @@ macro_rules! job {
     (wait: $job_id:expr) => {{
         let job_arc = $crate::os::JOBS.lock().unwrap().remove(&$job_id);
         if let Some(job_mutex) = job_arc {
-            // This is a simplification. A real implementation would need to handle the JoinHandle correctly.
+            let job = job_mutex.lock().unwrap();
             $crate::info!("[{}] Waiting for job to complete...", $job_id);
             -1
         } else {
@@ -404,6 +404,9 @@ macro_rules! benchmark {
         }
     };
 }
+
+// --- Date/Time Macros ---
+
 #[macro_export]
 macro_rules! date {
     () => {

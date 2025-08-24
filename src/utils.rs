@@ -122,6 +122,7 @@ pub fn num_greater_than(a: &str, b: &str) -> bool {
 }
 
 
+
 // --- Array Helpers ---
 
 /// Sets an array variable in the context.
@@ -135,6 +136,7 @@ pub fn set_array(key: &str, items: &[&str]) {
     }
     set_var(key, &items.join(" "));
 }
+
 
 
 // --- Parameter Expansion Helpers ---
@@ -165,6 +167,7 @@ pub fn var_substring(var: &str, offset: usize, length: Option<usize>) -> String 
 
 /// Implements `${var#pattern}` and `${var##pattern}`
 pub fn var_trim_prefix(var: &str, pattern: &str, longest: bool) -> String {
+
     if let Ok(p) = glob::Pattern::new(pattern) {
         let mut best_match_len = 0;
         let mut found_match = false;
@@ -184,10 +187,12 @@ pub fn var_trim_prefix(var: &str, pattern: &str, longest: bool) -> String {
         }
     }
     var.to_string()
+
 }
 
 /// Implements `${var%pattern}` and `${var%%pattern}`
 pub fn var_trim_suffix(var: &str, pattern: &str, longest: bool) -> String {
+
     if let Ok(p) = glob::Pattern::new(pattern) {
         let mut best_match_len = 0;
         let mut found_match = false;
@@ -207,6 +212,7 @@ pub fn var_trim_suffix(var: &str, pattern: &str, longest: bool) -> String {
         }
     }
     var.to_string()
+
 }
 
 /// Implements `${var/pattern/string}` and `${var//pattern/string}`
