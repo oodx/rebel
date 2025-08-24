@@ -30,7 +30,10 @@ fn main() {
         "config" => config,
         "process" => process_data,
         "test" => run_tests,
-        "meta-test" => meta_test
+        "meta-test" => meta_test,
+        "date-test" => date_test,
+        "path-test" => path_test,
+        "file-in-test" => file_in_test
     });
 }
 
@@ -235,3 +238,41 @@ fn meta_test(args: Args) -> i32 {
     echo!("Version: {}", get_var("META_version"));
     0
 }
+
+fn date_test(_args: Args) -> i32 {
+    info!("Testing date macros...");
+    echo!("Default: {}", date!());
+    echo!("Epoch: {}", date!(epoch));
+    echo!("Human: {}", date!(human));
+    echo!("Custom: {}", date!("%Y-%m-%d"));
+    let d = benchmark!({
+        // sleep for a short duration
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    });
+    info!("Benchmark macro returned duration: {:?}", d);
+    0
+}
+
+fn path_test(args: Args) -> i32 {
+    let path = args.get_or(1, "./README.md");
+    info!("Testing path macros for: {}", path);
+
+    let canon_path = path_canon!(&path);
+    echo!("Canonical Path: {}", canon_path);
+
+    path_split!(&path, into: "MYPATH");
+    echo!("Parent: {}", get_var("MYPATH_parent"));
+    echo!("Filename: {}", get_var("MYPATH_file_name"));
+    0
+}
+
+fn file_in_test(args: Args) -> i32 {
+    let dir = args.get_or(1, ".");
+    info!("Testing file_in! macro for dir: {}", dir);
+
+    file_in!(file in &dir => {
+        echo!("Found file: $file");
+    });
+    0
+}
+

@@ -8,4 +8,5 @@ pub mod macros;
 pub mod os;
 pub mod prelude;
 pub mod streams;
+pub mod time;
 pub mod utils;

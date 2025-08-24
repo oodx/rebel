@@ -122,6 +122,23 @@ pub fn num_greater_than(a: &str, b: &str) -> bool {
 }
 
 
+
+// --- Array Helpers ---
+
+/// Sets an array variable in the context.
+/// This stores the array as both a space-separated string
+/// and as indexed variables (e.g., MY_ARRAY_0, MY_ARRAY_1).
+pub fn set_array(key: &str, items: &[&str]) {
+    use crate::context::set_var;
+    set_var(&format!("{}_LENGTH", key), &items.len().to_string());
+    for (i, item) in items.iter().enumerate() {
+        set_var(&format!("{}_{}", key, i), *item);
+    }
+    set_var(key, &items.join(" "));
+}
+
+
+
 // --- Parameter Expansion Helpers ---
 
 /// Implements `${var:-default}`
@@ -150,22 +167,52 @@ pub fn var_substring(var: &str, offset: usize, length: Option<usize>) -> String 
 
 /// Implements `${var#pattern}` and `${var##pattern}`
 pub fn var_trim_prefix(var: &str, pattern: &str, longest: bool) -> String {
-    // This is a simplified version. A full implementation would need glob matching.
-    // For now, we'll treat the pattern as a simple prefix.
-    if longest {
-        // Not implemented, fallback to shortest
+
+    if let Ok(p) = glob::Pattern::new(pattern) {
+        let mut best_match_len = 0;
+        let mut found_match = false;
+        for i in 0..=var.len() {
+            let sub = &var[i..];
+            if p.matches(sub) {
+                let current_match_len = var.len() - sub.len();
+                if !found_match || (longest && current_match_len > best_match_len) || (!longest && current_match_len < best_match_len) {
+                    best_match_len = current_match_len;
+                    found_match = true;
+                    if !longest { break; } // For shortest match, take the first one
+                }
+            }
+        }
+        if found_match {
+            return var[best_match_len..].to_string();
+        }
     }
-    var.strip_prefix(pattern).unwrap_or(var).to_string()
+    var.to_string()
+
 }
 
 /// Implements `${var%pattern}` and `${var%%pattern}`
 pub fn var_trim_suffix(var: &str, pattern: &str, longest: bool) -> String {
-    // This is a simplified version. A full implementation would need glob matching.
-    // For now, we'll treat the pattern as a simple suffix.
-    if longest {
-        // Not implemented, fallback to shortest
+
+    if let Ok(p) = glob::Pattern::new(pattern) {
+        let mut best_match_len = 0;
+        let mut found_match = false;
+        for i in (0..=var.len()).rev() {
+            let sub = &var[..i];
+            if p.matches(sub) {
+                let current_match_len = i;
+                 if !found_match || (longest && current_match_len < best_match_len) || (!longest && current_match_len > best_match_len) {
+                    best_match_len = current_match_len;
+                    found_match = true;
+                    if !longest { break; } // For shortest match, take the first one
+                }
+            }
+        }
+        if found_match {
+            return var[..best_match_len].to_string();
+        }
     }
-    var.strip_suffix(pattern).unwrap_or(var).to_string()
+    var.to_string()
+
 }
 
 /// Implements `${var/pattern/string}` and `${var//pattern/string}`

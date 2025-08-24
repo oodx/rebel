@@ -85,6 +85,8 @@ macro_rules! stream {
     (files: $($path:expr),+) => { $crate::streams::Stream::from_files(&[$($path),+]) };
     (cmd: $command:expr) => { $crate::streams::Stream::from_cmd($command) };
     (string: $content:expr) => { $crate::streams::Stream::from_string($content) };
+    (array: $arr:expr) => { $crate::streams::Stream::from_vec($arr) };
+    (delimited: $content:expr, on: $delim:expr) => { $crate::streams::Stream::from_delimited_string($content, $delim) };
 }
 #[macro_export]
 macro_rules! shell {
@@ -388,7 +390,23 @@ macro_rules! param {
     ($var:expr, lower: first) => { $crate::utils::var_case_lower(&$crate::context::get_var($var), false) };
     ($var:expr, len) => { $crate::context::get_var($var).len() };
 }
+
+// --- Benchmarking & Time Macros ---
+#[macro_export]
+macro_rules! benchmark {
+    ($body:block) => {
+        {
+            let start = std::time::Instant::now();
+            $body
+            let duration = start.elapsed();
+            $crate::info!("Benchmark completed in: {:?}", duration);
+            duration
+        }
+    };
+}
+
 // --- Date/Time Macros ---
+
 #[macro_export]
 macro_rules! date {
     () => {

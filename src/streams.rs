@@ -58,6 +58,22 @@ impl Stream {
         Self::from_string(&content)
     }
 
+
+    /// Creates a stream from a vector of strings.
+    pub fn from_vec(lines: &[String]) -> Self {
+        Stream {
+            lines: lines.to_vec(),
+        }
+    }
+
+    /// Creates a stream from a single string by splitting it with a delimiter.
+    pub fn from_delimited_string(content: &str, delimiter: &str) -> Self {
+        Stream {
+            lines: content.split(delimiter).map(|s| s.to_string()).collect(),
+        }
+    }
+
+
     // --- Chainable Operations ---
 
     /// Filters lines in the stream, keeping only those that contain the pattern.
@@ -134,6 +150,41 @@ impl Stream {
         self.lines = self.lines.iter().map(|line| mapper(line)).collect();
         self
     }
+
+
+    /// Replaces a block of text between two patterns.
+    pub fn sed_block(mut self, start_pattern: &str, end_pattern: &str, replacement: &str) -> Self {
+        let mut result_lines = Vec::new();
+        let mut buffer = Vec::new();
+        let mut in_block = false;
+
+        for line in self.lines {
+            if !in_block && line.contains(start_pattern) {
+                in_block = true;
+                // The line that starts the block is part of the block
+                buffer.push(line);
+            } else if in_block && line.contains(end_pattern) {
+                in_block = false;
+                buffer.push(line);
+                // Perform the replacement on the entire block
+                let block_content = buffer.join("\n");
+                result_lines.push(block_content.replace(start_pattern, replacement).replace(end_pattern, ""));
+                buffer.clear();
+            } else if in_block {
+                buffer.push(line);
+            } else {
+                result_lines.push(line);
+            }
+        }
+        // What if the end pattern is never found? Append the buffer.
+        if !buffer.is_empty() {
+            result_lines.extend(buffer);
+        }
+
+        self.lines = result_lines;
+        self
+    }
+
 
     /// Pipes the stream's content as stdin to another shell command.
     pub fn pipe_to_cmd(self, command: &str) -> Self {

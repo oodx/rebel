@@ -221,6 +221,22 @@ pub fn path_split(path: &str) -> std::collections::HashMap<String, String> {
 
 // --- File System Test Functions ---
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_path_split() {
+        let parts = path_split("/home/user/file.txt");
+        assert_eq!(parts.get("parent").unwrap(), "/home/user");
+        assert_eq!(parts.get("file_name").unwrap(), "file.txt");
+        assert_eq!(parts.get("file_stem").unwrap(), "file");
+        assert_eq!(parts.get("extension").unwrap(), "txt");
+    }
+}
+
+
 /// Checks if a path exists and is a regular file.
 pub fn is_file(path: &str) -> bool {
     Path::new(&expand_vars(path)).is_file()
