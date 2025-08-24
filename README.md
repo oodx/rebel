@@ -136,7 +136,7 @@ $ cargo run -- hello RSB
 - **`param!(...)`**: A powerful macro for bash-style parameter expansion (e.g., `param!("VAR", default: "val")`, `param!("VAR", suffix: ".txt")`).
 - **`src!(path, ...)` / `load_config!(path, ...)`**: Loads variables from one or more configuration files.
 - **`export!(path)`**: Saves all context variables to a file in `export` format.
-- **`meta_key! (todo:is this missing?)
+- **`meta_key!(path, key)`**: Extracts a single metadata value from a file's header comments.
 - **`meta_keys!(path, into: "META")`**: Parses `# key: value` comments from a file and loads them into an associative array named `META`.
 
 

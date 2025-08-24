@@ -79,22 +79,60 @@ pub fn shell_exec(cmd: &str, silent: bool) -> Result<String, String> {
 
 use std::thread;
 
-pub enum JobStatus {
-    Running,
-    Completed(i32),
-}
-
 pub struct JobHandle {
     pub id: u32,
     pub command: String,
-    pub handle: thread::JoinHandle<CmdResult>,
-    pub status: Arc<Mutex<JobStatus>>,
+    pub handle: Option<thread::JoinHandle<()>>,
+    pub rx: std::sync::mpsc::Receiver<CmdResult>,
 }
 
 lazy_static! {
-    pub(crate) static ref JOBS: Arc<Mutex<HashMap<u32, Arc<Mutex<JobHandle>>>>> =
+    pub static ref JOBS: Arc<Mutex<HashMap<u32, Arc<Mutex<JobHandle>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
-    pub(crate) static ref JOB_COUNTER: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+    pub static ref JOB_COUNTER: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+}
+
+/// Waits for a specific job to complete and returns its exit status.
+/// This function will remove the job from the global JOBS map.
+pub fn wait_on_job(job_id: u32, timeout: Option<std::time::Duration>) -> Result<CmdResult, String> {
+    let job_arc = JOBS.lock().unwrap().remove(&job_id);
+
+    if let Some(job_arc) = job_arc {
+        // This is a bit complex. We need to get the JobHandle out of the Arc<Mutex<>>
+        // so we can consume its `rx` and `handle` fields.
+        if let Ok(job_mutex) = Arc::try_unwrap(job_arc) {
+            let job_handle = job_mutex.into_inner().map_err(|_| "Mutex was poisoned".to_string())?;
+
+            let result = if let Some(t) = timeout {
+                job_handle.rx.recv_timeout(t)
+            } else {
+                job_handle.rx.recv().map_err(|_| std::sync::mpsc::RecvTimeoutError::Disconnected)
+            };
+
+            return match result {
+                Ok(cmd_result) => {
+                    if let Some(h) = job_handle.handle {
+                        let _ = h.join(); // Join only on success
+                    }
+                    Ok(cmd_result)
+                },
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    // On timeout, we don't join the handle. The job is orphaned.
+                    // To prevent this, we'd need a more complex architecture to kill the process.
+                    // For now, we return the timeout error and let the thread detach.
+                    Err("Timeout".to_string())
+                },
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    if let Some(h) = job_handle.handle {
+                        let _ = h.join(); // Join on disconnect
+                    }
+                    Err("Job channel disconnected".to_string())
+                },
+            };
+        }
+    }
+
+    Err(format!("Job {} not found", job_id))
 }
 
 
