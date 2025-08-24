@@ -4,15 +4,18 @@ use crate::context::{expand_vars, has_var, COLORS, GLYPHS};
 // StringExt trait, array operations, and user interaction functions.
 
 // --- Output Helpers ---
+
 pub fn should_print_level(level: &str) -> bool {
     if has_var("QUIET_MODE") && !["error", "fatal"].contains(&level) {
         return false;
     }
+
     match level {
         "trace" | "think" => has_var("TRACE_MODE"),
         "debug" => has_var("DEBUG_MODE") || has_var("TRACE_MODE"),
         "info" | "warn" | "okay" => has_var("DEBUG_MODE") || has_var("DEV_MODE") || has_var("TRACE_MODE"),
         "error" | "fatal" => true,
+
         _ => true,
     }
 }
@@ -20,17 +23,27 @@ pub fn expand_colors(text: &str) -> String {
     let mut result = text.to_string();
     let colors = COLORS.lock().unwrap();
     let reset_code = colors.get("reset").cloned().unwrap_or_else(|| "\x1b[0m".to_string());
-    for (name, code) in colors.iter() {
-        if name != "reset" {
-            result = result.replace(&format!("{{{}}}", name), code);
-        }
+
+        _ => true, // Default to printing unknown levels
     }
+}
+
+/// Replaces color placeholders (e.g., `{red}`) with ANSI color codes.
+pub fn expand_colors(text: &str) -> String {
+    let mut result = text.to_string();
+    let colors = COLORS.lock().unwrap();
+    // Also get the reset code to append at the end
+    let reset_code = colors.get("reset").cloned().unwrap_or_else(|| "\x1b[0m".to_string());
+
+    //todo: is this correct?    
     result = result.replace("{reset}", &reset_code);
+
     if result.contains('\x1b') && !result.ends_with(&reset_code) {
         result.push_str(&reset_code);
     }
     result
 }
+
 pub fn glyph_stderr(level: &str, message: &str) {
     if !should_print_level(level) { return; }
     let glyphs = GLYPHS.lock().unwrap();
@@ -42,15 +55,19 @@ pub fn glyph_stderr(level: &str, message: &str) {
         _ => "reset",
     };
     let color_code = colors.get(color_name).cloned().unwrap_or_default();
+
     let expanded_msg = expand_vars(message);
     let final_msg = format!("{}{}{}", color_code, glyph, expanded_msg);
     eprintln!("{}", expand_colors(&final_msg));
 }
 
+
 // --- String & Name Helpers ---
+
 pub fn is_name(value: &str) -> bool {
     !value.is_empty() && value.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
 }
+
 
 // --- Comparison Helpers ---
 pub fn str_equals(a: &str, b: &str) -> bool { a == b }
@@ -67,13 +84,17 @@ pub fn num_eq(a: &str, b: &str) -> bool {
         _ => false,
     }
 }
+
 pub fn num_lt(a: &str, b: &str) -> bool {
+
     match (to_f64(a), to_f64(b)) {
         (Some(na), Some(nb)) => na < nb,
         _ => false,
     }
 }
+
 pub fn num_gt(a: &str, b: &str) -> bool {
+
     match (to_f64(a), to_f64(b)) {
         (Some(na), Some(nb)) => na > nb,
         _ => false,
@@ -120,6 +141,7 @@ pub fn get_array(key: &str) -> Vec<String> {
     }
     items
 }
+
 
 pub fn set_array(key: &str, items: &[&str]) {
     use crate::context::set_var;
@@ -196,6 +218,7 @@ pub fn str_sub(var: &str, offset: usize, length: Option<usize>) -> String {
     var.chars().skip(offset).take(len).collect()
 }
 pub fn str_prefix(var: &str, pattern: &str, longest: bool) -> String {
+
     if let Ok(p) = glob::Pattern::new(pattern) {
         let mut best_match_len = 0;
         let mut found_match = false;
@@ -206,6 +229,7 @@ pub fn str_prefix(var: &str, pattern: &str, longest: bool) -> String {
                 if !found_match || (longest && current_match_len > best_match_len) || (!longest && current_match_len < best_match_len) {
                     best_match_len = current_match_len;
                     found_match = true;
+
                     if !longest { break; }
                 }
             }
@@ -215,6 +239,7 @@ pub fn str_prefix(var: &str, pattern: &str, longest: bool) -> String {
     var.to_string()
 }
 pub fn str_suffix(var: &str, pattern: &str, longest: bool) -> String {
+
     if let Ok(p) = glob::Pattern::new(pattern) {
         let mut best_match_len = 0;
         let mut found_match = false;
@@ -225,6 +250,7 @@ pub fn str_suffix(var: &str, pattern: &str, longest: bool) -> String {
                  if !found_match || (longest && current_match_len < best_match_len) || (!longest && current_match_len > best_match_len) {
                     best_match_len = current_match_len;
                     found_match = true;
+
                     if !longest { break; }
                 }
             }
@@ -234,13 +260,16 @@ pub fn str_suffix(var: &str, pattern: &str, longest: bool) -> String {
     var.to_string()
 }
 pub fn str_replace(var: &str, pattern: &str, replacement: &str, all: bool) -> String {
+
     if all {
         var.replace(pattern, replacement)
     } else {
         var.replacen(pattern, replacement, 1)
     }
 }
+
 pub fn str_upper(var: &str, all: bool) -> String {
+
     if all {
         var.to_uppercase()
     } else {
@@ -251,7 +280,9 @@ pub fn str_upper(var: &str, all: bool) -> String {
         }
     }
 }
+
 pub fn str_lower(var: &str, all: bool) -> String {
+
     if all {
         var.to_lowercase()
     } else {
@@ -272,6 +303,7 @@ mod tests {
         assert_eq!(str_replace("hello world world", "world", "rust", false), "hello rust world");
         assert_eq!(str_replace("hello world world", "world", "rust", true), "hello rust rust");
     }
+
     #[test]
     fn test_is_name() {
         assert!(is_name("valid-name"));

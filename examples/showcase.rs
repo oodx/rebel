@@ -261,6 +261,7 @@ fn system_test(_args: Args) -> i32 {
     0
 }
 
+
 fn date_test(_args: Args) -> i32 {
     info!("Testing date macros...");
     echo!("Default: {}", date!());

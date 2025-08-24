@@ -263,6 +263,7 @@ mod tests {
     }
 }
 
+
 /// Checks if a path exists and is a regular file.
 pub fn is_file(path: &str) -> bool {
     Path::new(&expand_vars(path)).is_file()

@@ -72,6 +72,7 @@ impl Stream {
         }
     }
 
+
     // --- Chainable Operations ---
 
     /// Filters lines in the stream, keeping only those that contain the pattern.
@@ -181,6 +182,7 @@ impl Stream {
         self.lines = result_lines;
         self
     }
+
 
     /// Pipes the stream's content as stdin to another shell command.
     pub fn pipe_to_cmd(self, command: &str) -> Self {
