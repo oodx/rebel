@@ -298,4 +298,3 @@ fn file_in_test(args: Args) -> i32 {
     });
     0
 }
-

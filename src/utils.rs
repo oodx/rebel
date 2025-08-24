@@ -35,18 +35,8 @@ pub fn expand_colors(text: &str) -> String {
     // Also get the reset code to append at the end
     let reset_code = colors.get("reset").cloned().unwrap_or_else(|| "\x1b[0m".to_string());
 
-
-    for (name, code) in colors.iter() {
-        if name != "reset" {
-            result = result.replace(&format!("{{{}}}", name), code);
-        }
-    }
-
-
-    // Replace the specific {reset} placeholder
+    //todo: is this correct?    
     result = result.replace("{reset}", &reset_code);
-
-    // Ensure reset is applied at the end if a color was used
 
     if result.contains('\x1b') && !result.ends_with(&reset_code) {
         result.push_str(&reset_code);
@@ -66,8 +56,6 @@ pub fn glyph_stderr(level: &str, message: &str) {
     };
     let color_code = colors.get(color_name).cloned().unwrap_or_default();
 
-    // Manually format to avoid issues with user-provided format strings
-
     let expanded_msg = expand_vars(message);
     let final_msg = format!("{}{}{}", color_code, glyph, expanded_msg);
     eprintln!("{}", expand_colors(&final_msg));
@@ -75,8 +63,6 @@ pub fn glyph_stderr(level: &str, message: &str) {
 
 
 // --- String & Name Helpers ---
-
-/// Checks if a string is a valid name (alphanumeric + '-' and '_').
 
 pub fn is_name(value: &str) -> bool {
     !value.is_empty() && value.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
@@ -114,7 +100,6 @@ pub fn num_gt(a: &str, b: &str) -> bool {
         _ => false,
     }
 }
-
 
 // --- Array Helpers ---
 

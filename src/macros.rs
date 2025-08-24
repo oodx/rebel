@@ -134,7 +134,9 @@ macro_rules! job {
         let job_arc = $crate::os::JOBS.lock().unwrap().remove(&$job_id);
         if let Some(job_mutex) = job_arc {
 
+             //todo: is this correct?
             let job = job_mutex.lock().unwrap();
+
 
             $crate::info!("[{}] Waiting for job to complete...", $job_id);
             -1
@@ -195,8 +197,8 @@ macro_rules! trap {
 
 
 // --- Loop Macros ---
-
 /// A macro for shell-style `for in` loops over RSB arrays.
+
 #[macro_export]
 macro_rules! for_in {
     ($var:ident in $array_name:expr => $body:block) => {
@@ -241,6 +243,7 @@ macro_rules! test {
     ($a:expr, -ge, $b:expr) => { $crate::utils::num_gt($a, $b) || $crate::utils::num_eq($a, $b) };
 
 }
+
 #[macro_export]
 macro_rules! case {
     ($value:expr, { $($pattern:expr => $body:block),* $(, _ => $default:block)? }) => {
@@ -259,27 +262,47 @@ macro_rules! case {
 }
 
 
-// --- User Interaction Macros ---
-
 #[macro_export]
 macro_rules! prompt {
-    ($message:expr) => {
-        $crate::utils::prompt_user($message, None)
-    };
-    ($message:expr, default: $default:expr) => {
-        $crate::utils::prompt_user($message, Some($default))
-    };
+    ($message:expr) => { $crate::utils::prompt_user($message, None) };
+    ($message:expr, default: $default:expr) => { $crate::utils::prompt_user($message, Some($default)) };
 }
-
 #[macro_export]
 macro_rules! confirm {
-    ($message:expr) => {
-        $crate::utils::confirm_action($message, None)
-    };
-    ($message:expr, default: $default:expr) => {
-        $crate::utils::confirm_action($message, Some($default))
-    };
+    ($message:expr) => { $crate::utils::confirm_action($message, None) };
+    ($message:expr, default: $default:expr) => { $crate::utils::confirm_action($message, Some($default)) };
 }
+
+// --- System & Random Macros ---
+#[macro_export]
+macro_rules! rand_range {
+    ($min:expr, $max:expr) => {{
+        use rand::Rng;
+        rand::thread_rng().gen_range($min..=$max)
+    }};
+}
+#[macro_export]
+macro_rules! clear {
+    () => { print!("\x1B[2J\x1B[1;1H"); };
+}
+#[macro_export]
+macro_rules! sleep {
+    ($seconds:expr) => { std::thread::sleep(std::time::Duration::from_secs($seconds)) };
+    (ms: $ms:expr) => { std::thread::sleep(std::time::Duration::from_millis($ms)) };
+}
+#[macro_export]
+macro_rules! str_line {
+    ($char:expr, $count:expr) => { $char.to_string().repeat($count) };
+}
+#[macro_export]
+macro_rules! chmod {
+    ($path:expr, $mode:expr) => { $crate::fs::chmod($path, $mode).ok() };
+}
+#[macro_export]
+macro_rules! backup {
+    ($path:expr, $suffix:expr) => { $crate::fs::backup_file($path, $suffix).ok() };
+}
+
 
 
 // --- System & Random Macros ---
@@ -334,7 +357,6 @@ macro_rules! backup {
         $crate::fs::backup_file($path, $suffix).ok()
     };
 }
-
 
 
 // --- Meta & Path Macros ---
@@ -511,9 +533,6 @@ macro_rules! benchmark {
     };
 }
 
-// --- Date/Time Macros ---
-
-
 #[macro_export]
 macro_rules! date {
     () => {
@@ -532,3 +551,47 @@ macro_rules! date {
         chrono::Local::now().format($format).to_string()
     };
 }
+
+// --- String Utilities ---
+#[macro_export]
+macro_rules! str_in {
+    ($needle:expr, in: $haystack:expr) => {
+        $haystack.contains($needle)
+    };
+}
+#[macro_export]
+macro_rules! str_explode {
+    ($string:expr, on: $delim:expr, into: $arr_name:expr) => {
+        {
+            let items: Vec<&str> = $string.split($delim).collect();
+            $crate::utils::set_array($arr_name, &items);
+        }
+    };
+}
+#[macro_export]
+macro_rules! str_trim {
+    ($var:expr) => {
+        $crate::context::get_var($var).trim().to_string()
+    };
+}
+#[macro_export]
+macro_rules! str_len {
+    ($var:expr) => {
+        $crate::context::get_var($var).len()
+    };
+}
+
+// --- File System Macros ---
+#[macro_export]
+macro_rules! chmod {
+    ($path:expr, $mode:expr) => {
+        $crate::fs::chmod($path, $mode).ok()
+    };
+}
+#[macro_export]
+macro_rules! backup {
+    ($path:expr, $suffix:expr) => {
+        $crate::fs::backup_file($path, $suffix).ok()
+    };
+}
+
