@@ -106,7 +106,8 @@ $ cargo run -- hello RSB
 
 ## API Reference
 
-### Core Macros
+
+### Core & Bootstrap
 
 - **`bootstrap!() -> Vec<String>`**: Initializes the RSB environment (loads env vars, sets up paths) and returns the command-line arguments. The one-stop-shop for starting your script.
 - **`args!() -> Vec<String>`**: A standalone macro to just get the command-line arguments.
@@ -131,10 +132,23 @@ All logging macros print to `stderr` and support standard Rust formatting.
 
 - **`set_var(key, value)`**: Sets a variable in the global context.
 - **`get_var(key) -> String`**: Gets a variable from the context.
+
 - **`param!(...)`**: A powerful macro for bash-style parameter expansion (e.g., `param!("VAR", default: "val")`, `param!("VAR", suffix: ".txt")`).
 - **`src!(path, ...)` / `load_config!(path, ...)`**: Loads variables from one or more configuration files.
 - **`export!(path)`**: Saves all context variables to a file in `export` format.
 - **`meta_keys!(path, into: "META")`**: Parses `# key: value` comments from a file and loads them into an associative array named `META`.
+
+
+### Array Utilities
+- **`set_array(name, &["a", "b"])`**: Creates an array variable.
+- **`get_array(name) -> Vec<String>`**: Retrieves an array.
+- **`array_push(name, item)`**: Appends an item to an array.
+- **`for_in!(item in "ARRAY_NAME" => { ... })`**: Iterates over an RSB array.
+
+### Stream Processing
+
+- **Sources**: `cat!(path)`, `cmd!(command)`, `pipe!(string)`, `stream!(array: &vec)`.
+- **Methods**: `.grep()`, `.sed()`, `.cut()`, `.sort()`, `.unique()`, `.tee(path)`, `.to_file(path)`, `.each(|line| ...)`
 
 ### Stream Processing (`cat!`, `cmd!`, `pipe!`)
 
@@ -153,14 +167,25 @@ let unique_lines = cat!("file.txt")
 - **Sources**: `cat!(path)`, `cmd!(command)`, `pipe!(string)`
 - **Sinks**: `.to_string()`, `.to_vec()`, `.to_file(path)`, `.tee(path)`, `.each(|line| ...)`
 
+
 ### Conditional Logic
 
 - **`validate!(condition, message)`**: Exits with an error if the condition is false.
 - **`require_file!(path)`**: Exits if the file does not exist.
+- **`test!(...)`**: A comprehensive macro for bash-style tests (e.g., `test!(-f "file")`, `test!(var -gt 10)`).
+- **`case!(value, { ... })`**: A shell-style `case` statement with regex pattern matching.
+
+### System & Time
+- **`sleep!(1)` / `sleep!(ms: 100)`**: Pauses execution.
+- **`date!(iso)` / `date!(epoch)` / `date!("%Y-%m-%d")`**: Gets the current time in various formats.
+- **`benchmark!({ ... })`**: Measures the execution time of a code block.
+- **`trap!(|| ..., on: "SIGINT")`**: Traps OS signals and other custom events.
+
 - **`require_dir!(path)`**: Exits if the directory does not exist.
 - **`require_command!(cmd)`**: Exits if the command is not in the `PATH`.
 - **`require_var!(name)`**: Exits if the variable is not set.
 - **`test!(...)`**: A comprehensive macro for bash-style tests (e.g., `test!(-f "file")`, `test!(var -gt 10)`).
 - **`case!(value, { ... })`**: A shell-style `case` statement with regex pattern matching.
+
 
 Welcome to a more rebellious, productive way of writing scripts in Rust.

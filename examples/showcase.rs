@@ -33,7 +33,9 @@ fn main() {
         "meta-test" => meta_test,
         "date-test" => date_test,
         "path-test" => path_test,
-        "file-in-test" => file_in_test
+        "file-in-test" => file_in_test,
+        "array-test" => array_test,
+        "system-test" => system_test
     });
 }
 
@@ -238,6 +240,27 @@ fn meta_test(args: Args) -> i32 {
     echo!("Version: {}", get_var("META_version"));
     0
 }
+
+fn array_test(_args: Args) -> i32 {
+    info!("Testing array utilities...");
+    set_array("MY_ARRAY", &["a", "b", "c"]);
+    echo!("Array: $MY_ARRAY");
+    echo!("Length: {}", array_length("MY_ARRAY"));
+    echo!("Item 1: {}", array_get("MY_ARRAY", 1));
+    array_push("MY_ARRAY", "d");
+    echo!("Pushed 'd', new array: $MY_ARRAY");
+    0
+}
+
+fn system_test(_args: Args) -> i32 {
+    info!("Testing system utilities...");
+    echo!("Line: {}", str_line!('-', 10));
+    let num = rand_range!(1, 100);
+    echo!("Random number: {}", num);
+    validate!(num >= 1 && num <= 100, "Random number out of range");
+    0
+}
+
 
 fn date_test(_args: Args) -> i32 {
     info!("Testing date macros...");

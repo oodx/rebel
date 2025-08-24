@@ -133,7 +133,9 @@ macro_rules! job {
     (wait: $job_id:expr) => {{
         let job_arc = $crate::os::JOBS.lock().unwrap().remove(&$job_id);
         if let Some(job_mutex) = job_arc {
+
             let job = job_mutex.lock().unwrap();
+
             $crate::info!("[{}] Waiting for job to complete...", $job_id);
             -1
         } else {
@@ -191,6 +193,28 @@ macro_rules! trap {
     (on_command_start $handler:expr) => { $crate::event!(register "command_start", $handler); };
 }
 
+
+// --- Loop Macros ---
+
+/// A macro for shell-style `for in` loops over RSB arrays.
+#[macro_export]
+macro_rules! for_in {
+    ($var:ident in $array_name:expr => $body:block) => {
+        for item in $crate::utils::get_array($array_name) {
+            $crate::context::set_var(stringify!($var), &item);
+            $body
+        }
+    };
+    ($index:ident, $var:ident in $array_name:expr => $body:block) => {
+        for (i, item) in $crate::utils::get_array($array_name).iter().enumerate() {
+            $crate::context::set_var(stringify!($index), &i.to_string());
+            $crate::context::set_var(stringify!($var), item);
+            $body
+        }
+    };
+}
+
+
 // --- Logic and Control Flow Macros ---
 #[macro_export]
 macro_rules! test {
@@ -209,12 +233,13 @@ macro_rules! test {
     ($a:expr, =~, $b:expr) => { $crate::utils::str_matches($a, $b) };
     ($a:expr, <, $b:expr) => { $a < $b };
     ($a:expr, >, $b:expr) => { $a > $b };
-    ($a:expr, -eq, $b:expr) => { $crate::utils::num_equals($a, $b) };
-    ($a:expr, -ne, $b:expr) => { !$crate::utils::num_equals($a, $b) };
-    ($a:expr, -lt, $b:expr) => { $crate::utils::num_less_than($a, $b) };
-    ($a:expr, -le, $b:expr) => { $crate::utils::num_less_than($a, $b) || $crate::utils::num_equals($a, $b) };
-    ($a:expr, -gt, $b:expr) => { $crate::utils::num_greater_than($a, $b) };
-    ($a:expr, -ge, $b:expr) => { $crate::utils::num_greater_than($a, $b) || $crate::utils::num_equals($a, $b) };
+    ($a:expr, -eq, $b:expr) => { $crate::utils::num_eq($a, $b) };
+    ($a:expr, -ne, $b:expr) => { !$crate::utils::num_eq($a, $b) };
+    ($a:expr, -lt, $b:expr) => { $crate::utils::num_lt($a, $b) };
+    ($a:expr, -le, $b:expr) => { $crate::utils::num_lt($a, $b) || $crate::utils::num_eq($a, $b) };
+    ($a:expr, -gt, $b:expr) => { $crate::utils::num_gt($a, $b) };
+    ($a:expr, -ge, $b:expr) => { $crate::utils::num_gt($a, $b) || $crate::utils::num_eq($a, $b) };
+
 }
 #[macro_export]
 macro_rules! case {
@@ -232,6 +257,85 @@ macro_rules! case {
         }
     };
 }
+
+
+// --- User Interaction Macros ---
+
+#[macro_export]
+macro_rules! prompt {
+    ($message:expr) => {
+        $crate::utils::prompt_user($message, None)
+    };
+    ($message:expr, default: $default:expr) => {
+        $crate::utils::prompt_user($message, Some($default))
+    };
+}
+
+#[macro_export]
+macro_rules! confirm {
+    ($message:expr) => {
+        $crate::utils::confirm_action($message, None)
+    };
+    ($message:expr, default: $default:expr) => {
+        $crate::utils::confirm_action($message, Some($default))
+    };
+}
+
+
+// --- System & Random Macros ---
+
+/// Generates a random number in a given range.
+#[macro_export]
+macro_rules! rand_range {
+    ($min:expr, $max:expr) => {
+        {
+            use rand::Rng;
+            rand::thread_rng().gen_range($min..=$max)
+        }
+    };
+}
+
+/// Clears the terminal screen.
+#[macro_export]
+macro_rules! clear {
+    () => {
+        print!("\x1B[2J\x1B[1;1H");
+    };
+}
+
+/// Pauses execution for a number of seconds or milliseconds.
+#[macro_export]
+macro_rules! sleep {
+    ($seconds:expr) => {
+        std::thread::sleep(std::time::Duration::from_secs($seconds))
+    };
+    (ms: $ms:expr) => {
+        std::thread::sleep(std::time::Duration::from_millis($ms))
+    };
+}
+
+/// Creates a string by repeating a character.
+#[macro_export]
+macro_rules! str_line {
+    ($char:expr, $count:expr) => {
+        $char.to_string().repeat($count)
+    };
+}
+#[macro_export]
+macro_rules! chmod {
+    ($path:expr, $mode:expr) => {
+        $crate::fs::chmod($path, $mode).ok()
+    };
+}
+
+#[macro_export]
+macro_rules! backup {
+    ($path:expr, $suffix:expr) => {
+        $crate::fs::backup_file($path, $suffix).ok()
+    };
+}
+
+
 
 // --- Meta & Path Macros ---
 #[macro_export]
@@ -376,18 +480,20 @@ macro_rules! param {
         let val = $crate::context::get_var($var);
         if val.is_empty() { String::new() } else { $alt.to_string() }
     }};
-    ($var:expr, sub: $start:expr) => { $crate::utils::var_substring(&$crate::context::get_var($var), $start, None) };
-    ($var:expr, sub: $start:expr, $len:expr) => { $crate::utils::var_substring(&$crate::context::get_var($var), $start, Some($len)) };
-    ($var:expr, prefix: $pattern:expr) => { $crate::utils::var_trim_prefix(&$crate::context::get_var($var), $pattern, false) };
-    ($var:expr, prefix: $pattern:expr, longest) => { $crate::utils::var_trim_prefix(&$crate::context::get_var($var), $pattern, true) };
-    ($var:expr, suffix: $pattern:expr) => { $crate::utils::var_trim_suffix(&$crate::context::get_var($var), $pattern, false) };
-    ($var:expr, suffix: $pattern:expr, longest) => { $crate::utils::var_trim_suffix(&$crate::context::get_var($var), $pattern, true) };
-    ($var:expr, replace: $from:expr => $to:expr) => { $crate::utils::var_replace(&$crate::context::get_var($var), $from, $to, false) };
-    ($var:expr, replace: $from:expr => $to:expr, all) => { $crate::utils::var_replace(&$crate::context::get_var($var), $from, $to, true) };
-    ($var:expr, upper) => { $crate::utils::var_case_upper(&$crate::context::get_var($var), true) };
-    ($var:expr, lower) => { $crate::utils::var_case_lower(&$crate::context::get_var($var), true) };
-    ($var:expr, upper: first) => { $crate::utils::var_case_upper(&$crate::context::get_var($var), false) };
-    ($var:expr, lower: first) => { $crate::utils::var_case_lower(&$crate::context::get_var($var), false) };
+
+    ($var:expr, sub: $start:expr) => { $crate::utils::str_sub(&$crate::context::get_var($var), $start, None) };
+    ($var:expr, sub: $start:expr, $len:expr) => { $crate::utils::str_sub(&$crate::context::get_var($var), $start, Some($len)) };
+    ($var:expr, prefix: $pattern:expr) => { $crate::utils::str_prefix(&$crate::context::get_var($var), $pattern, false) };
+    ($var:expr, prefix: $pattern:expr, longest) => { $crate::utils::str_prefix(&$crate::context::get_var($var), $pattern, true) };
+    ($var:expr, suffix: $pattern:expr) => { $crate::utils::str_suffix(&$crate::context::get_var($var), $pattern, false) };
+    ($var:expr, suffix: $pattern:expr, longest) => { $crate::utils::str_suffix(&$crate::context::get_var($var), $pattern, true) };
+    ($var:expr, replace: $from:expr => $to:expr) => { $crate::utils::str_replace(&$crate::context::get_var($var), $from, $to, false) };
+    ($var:expr, replace: $from:expr => $to:expr, all) => { $crate::utils::str_replace(&$crate::context::get_var($var), $from, $to, true) };
+    ($var:expr, upper) => { $crate::utils::str_upper(&$crate::context::get_var($var), true) };
+    ($var:expr, lower) => { $crate::utils::str_lower(&$crate::context::get_var($var), true) };
+    ($var:expr, upper: first) => { $crate::utils::str_upper(&$crate::context::get_var($var), false) };
+    ($var:expr, lower: first) => { $crate::utils::str_lower(&$crate::context::get_var($var), false) };
+
     ($var:expr, len) => { $crate::context::get_var($var).len() };
 }
 
@@ -406,6 +512,7 @@ macro_rules! benchmark {
 }
 
 // --- Date/Time Macros ---
+
 
 #[macro_export]
 macro_rules! date {

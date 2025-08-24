@@ -190,6 +190,34 @@ pub fn extract_meta_from_file(path: &str) -> std::collections::HashMap<String, S
 }
 
 
+// --- Advanced File Utilities ---
+
+/// Backs up a file by copying it with a given suffix.
+pub fn backup_file(path: &str, suffix: &str) -> Result<String, std::io::Error> {
+    let expanded_path = expand_vars(path);
+    let backup_path = format!("{}{}", expanded_path, suffix);
+    std::fs::copy(&expanded_path, &backup_path)?;
+    Ok(backup_path)
+}
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
+/// Changes the permissions of a file (Unix only).
+#[cfg(unix)]
+pub fn chmod(path: &str, mode: &str) -> Result<(), std::io::Error> {
+    let mode_octal = u32::from_str_radix(mode, 8).unwrap_or(0o644);
+    let perms = std::fs::Permissions::from_mode(mode_octal);
+    std::fs::set_permissions(expand_vars(path), perms)
+}
+
+#[cfg(not(unix))]
+pub fn chmod(path: &str, mode: &str) -> Result<(), std::io::Error> {
+    // No-op on non-unix systems
+    Ok(())
+}
+
+
 // --- Path Utilities ---
 
 /// Canonicalizes a path, returning its absolute form.
@@ -220,7 +248,6 @@ pub fn path_split(path: &str) -> std::collections::HashMap<String, String> {
 
 
 // --- File System Test Functions ---
-
 
 #[cfg(test)]
 mod tests {
