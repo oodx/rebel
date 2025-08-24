@@ -55,3 +55,45 @@ fn test_path_split_macro() {
         .stdout(predicate::str::contains("Parent: /tmp/some"))
         .stdout(predicate::str::contains("Filename: file.txt"));
 }
+
+#[test]
+fn test_job_control_wait_and_timeout() {
+    // Test successful wait
+    let mut wait_cmd = get_example_cmd();
+    wait_cmd.arg("job-test-integration");
+    wait_cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("wait_status=0"));
+
+    // Test timeout
+    let mut timeout_cmd = get_example_cmd();
+    timeout_cmd.arg("job-test-timeout-integration");
+    timeout_cmd.assert()
+        .success()
+        .stderr(predicate::str::contains("Timeout"))
+        .stdout(predicate::str::contains("timeout_status=-1"));
+}
+
+#[test]
+fn test_sed_block() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("sed-block-test");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("<setting>new_value</setting>"))
+        .stdout(predicate::str::contains("Unclosed block contains: old_value"));
+}
+
+#[test]
+fn test_color_config() {
+    let mut cmd = get_example_cmd();
+    // Override the color for 'error' and the glyph for 'warn'
+    cmd.env("RSB_COLORS", "error:[magenta],warn:[,>>]");
+    cmd.env("DEBUG", "1"); // Ensure all levels are printed
+    cmd.arg("color-test");
+
+    cmd.assert()
+        .success()
+        .stderr(predicate::str::contains("\x1b[35m")) // Check for magenta color code for error
+        .stderr(predicate::str::contains(">> This is a warning message.")); // Check for new warn glyph
+}

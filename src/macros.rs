@@ -112,37 +112,43 @@ macro_rules! job {
         *counter += 1;
         let job_id = *counter;
         let cmd_string = $command.to_string();
-        let job_status = std::sync::Arc::new(std::sync::Mutex::new($crate::os::JobStatus::Running));
-        let status_clone = job_status.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let cmd_string_for_thread = cmd_string.clone();
+
         let handle = std::thread::spawn(move || {
-            let result = $crate::os::run_cmd_with_status(&cmd_string);
-            let mut status = status_clone.lock().unwrap();
-            *status = $crate::os::JobStatus::Completed(result.status);
-            result
+            let result = $crate::os::run_cmd_with_status(&cmd_string_for_thread);
+            let _ = tx.send(result);
         });
+
         let job_handle = $crate::os::JobHandle {
             id: job_id,
             command: cmd_string,
-            handle,
-            status: job_status,
+            handle: Some(handle),
+            rx: rx,
         };
         $crate::os::JOBS.lock().unwrap().insert(job_id, std::sync::Arc::new(std::sync::Mutex::new(job_handle)));
         $crate::info!("[{}] Started background job", job_id);
         job_id
     }};
     (wait: $job_id:expr) => {{
-        let job_arc = $crate::os::JOBS.lock().unwrap().remove(&$job_id);
-        if let Some(job_mutex) = job_arc {
-
-             //todo: is this correct?
-            let job = job_mutex.lock().unwrap();
-
-
-            $crate::info!("[{}] Waiting for job to complete...", $job_id);
-            -1
-        } else {
-            $crate::error!("Job {} not found", $job_id);
-            -1
+        $crate::info!("[{}] Waiting for job to complete...", $job_id);
+        match $crate::os::wait_on_job($job_id, None) {
+            Ok(result) => result.status,
+            Err(e) => {
+                $crate::error!("Failed to wait for job {}: {}", $job_id, e);
+                -1
+            }
+        }
+    }};
+    (timeout: $timeout:expr, wait: $job_id:expr) => {{
+        $crate::info!("[{}] Waiting for job to complete (timeout: {}s)...", $job_id, $timeout);
+        let timeout_duration = std::time::Duration::from_secs($timeout);
+        match $crate::os::wait_on_job($job_id, Some(timeout_duration)) {
+            Ok(result) => result.status,
+            Err(e) => {
+                $crate::error!("Failed to wait for job {}: {}", $job_id, e);
+                -1
+            }
         }
     }};
     (list) => {{
@@ -152,8 +158,8 @@ macro_rules! job {
         } else {
             $crate::info!("Running jobs:");
             for (id, job_mutex) in jobs.iter() {
-                 let job = job_mutex.lock().unwrap();
-                 $crate::echo!("[{}] {}", id, job.command);
+                let job = job_mutex.lock().unwrap();
+                $crate::echo!("[{}] {}", id, job.command);
             }
         }
     }};
@@ -274,38 +280,6 @@ macro_rules! confirm {
 }
 
 // --- System & Random Macros ---
-#[macro_export]
-macro_rules! rand_range {
-    ($min:expr, $max:expr) => {{
-        use rand::Rng;
-        rand::thread_rng().gen_range($min..=$max)
-    }};
-}
-#[macro_export]
-macro_rules! clear {
-    () => { print!("\x1B[2J\x1B[1;1H"); };
-}
-#[macro_export]
-macro_rules! sleep {
-    ($seconds:expr) => { std::thread::sleep(std::time::Duration::from_secs($seconds)) };
-    (ms: $ms:expr) => { std::thread::sleep(std::time::Duration::from_millis($ms)) };
-}
-#[macro_export]
-macro_rules! str_line {
-    ($char:expr, $count:expr) => { $char.to_string().repeat($count) };
-}
-#[macro_export]
-macro_rules! chmod {
-    ($path:expr, $mode:expr) => { $crate::fs::chmod($path, $mode).ok() };
-}
-#[macro_export]
-macro_rules! backup {
-    ($path:expr, $suffix:expr) => { $crate::fs::backup_file($path, $suffix).ok() };
-}
-
-
-
-// --- System & Random Macros ---
 
 /// Generates a random number in a given range.
 #[macro_export]
@@ -342,19 +316,6 @@ macro_rules! sleep {
 macro_rules! str_line {
     ($char:expr, $count:expr) => {
         $char.to_string().repeat($count)
-    };
-}
-#[macro_export]
-macro_rules! chmod {
-    ($path:expr, $mode:expr) => {
-        $crate::fs::chmod($path, $mode).ok()
-    };
-}
-
-#[macro_export]
-macro_rules! backup {
-    ($path:expr, $suffix:expr) => {
-        $crate::fs::backup_file($path, $suffix).ok()
     };
 }
 
@@ -581,17 +542,4 @@ macro_rules! str_len {
     };
 }
 
-// --- File System Macros ---
-#[macro_export]
-macro_rules! chmod {
-    ($path:expr, $mode:expr) => {
-        $crate::fs::chmod($path, $mode).ok()
-    };
-}
-#[macro_export]
-macro_rules! backup {
-    ($path:expr, $suffix:expr) => {
-        $crate::fs::backup_file($path, $suffix).ok()
-    };
-}
 
