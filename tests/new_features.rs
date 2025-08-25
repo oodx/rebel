@@ -93,6 +93,7 @@ fn test_random_macros() {
         .success()
         .stdout(predicate::str::is_match(r"^rand_alnum: .{10}\n").unwrap())
         .stdout(predicate::str::is_match(r"rand_uuid: ........-....-....-....-............\n").unwrap());
+
 }
 
 #[test]

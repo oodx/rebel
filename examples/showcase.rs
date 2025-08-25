@@ -35,7 +35,17 @@ fn main() {
         "path-test" => path_test,
         "file-in-test" => file_in_test,
         "array-test" => array_test,
-        "system-test" => system_test
+        "system-test" => system_test,
+        "job-test" => job_test,
+        "sed-block-test" => sed_block_test,
+        "color-test" => color_test,
+        "job-test-integration" => job_test_integration,
+        "job-test-timeout-integration" => job_test_timeout_integration,
+        "math-test" => math_test,
+        "cap-stream-test" => cap_stream_test,
+        "trap-test" => trap_test,
+        "random-test" => random_test,
+        "dict-test" => dict_test
     });
 }
 
@@ -296,5 +306,145 @@ fn file_in_test(args: Args) -> i32 {
     file_in!(file in &dir => {
         echo!("Found file: $file");
     });
+    0
+}
+
+// --- Test Handlers for New Features ---
+
+fn job_test(args: Args) -> i32 {
+    let action = args.get_or(1, "help");
+    match action.as_str() {
+        "start" => {
+            let job_id = job!(background: "sleep 2; echo 'Job Done'");
+            echo!("job_id={}", job_id);
+        }
+        "wait" => {
+            let job_id: u32 = args.get_or(2, "0").parse().unwrap_or(0);
+            let status = job!(wait: job_id);
+            echo!("wait_status={}", status);
+        }
+        "timeout" => {
+            let _job_id: u32 = args.get_or(2, "0").parse().unwrap_or(0);
+            // This job runs for 5 seconds, but we time out after 1.
+            let long_job_id = job!(background: "sleep 5; echo 'Should not see this'");
+            let status = job!(timeout: 1, wait: long_job_id);
+            echo!("timeout_status={}", status);
+        }
+        _ => {
+            error!("Unknown job-test action: {}", action);
+            return 1;
+        }
+    }
+    0
+}
+
+fn sed_block_test(_args: Args) -> i32 {
+    let content = "
+    # Other file content
+    <config>
+        <setting>old_value</setting>
+    </config>
+    # More content
+    ";
+
+    // Test replacing content within the block
+    let result1 = pipe!(content)
+        .sed_block("<config>", "</config>", "s/old_value/new_value/g")
+        .to_string();
+    echo!("--- Test 1: Replace 'old_value' ---\n{}", result1);
+
+    // Test with no end pattern
+    let result2 = pipe!(content)
+        .sed_block("<config>", "NO_SUCH_END", "s/old_value/new_value/g")
+        .to_string();
+    if result2.contains("old_value") {
+        echo!("Unclosed block contains: old_value");
+    }
+    echo!("--- Test 2: No end pattern ---\n{}", result2);
+
+    0
+}
+
+fn color_test(_args: Args) -> i32 {
+    info!("This is an info message.");
+    okay!("This is an okay message.");
+    warn!("This is a warning message.");
+    error!("This is an error message.");
+    fatal!("This is a fatal message.");
+    debug!("This is a debug message.");
+    trace!("This is a trace message.");
+    0
+}
+
+fn job_test_integration(_args: Args) -> i32 {
+    let job_id = job!(background: "sleep 1; echo 'Job Done'");
+    info!("Started job {}", job_id);
+    let status = job!(wait: job_id);
+    echo!("wait_status={}", status);
+    0
+}
+
+fn job_test_timeout_integration(_args: Args) -> i32 {
+    let job_id = job!(background: "sleep 3; echo 'Should not happen'");
+    info!("Started job {}", job_id);
+    let status = job!(timeout: 1, wait: job_id);
+    echo!("timeout_status={}", status);
+    0
+}
+
+fn math_test(_args: Args) -> i32 {
+    set_var("A", "10");
+    set_var("B", "3.5");
+    math!("C = (A + 5) * B / 2"); // (10 + 5) * 3.5 / 2 = 15 * 3.5 / 2 = 52.5 / 2 = 26.25
+    echo!("C = {}", get_var("C"));
+    math!("C += 1.75");
+    echo!("C += 1.75 -> {}", get_var("C")); // 28.0
+    0
+}
+
+fn cap_stream_test(_args: Args) -> i32 {
+    let mut stream = pipe!("hello\nworld");
+    let temp_path = cap_stream!(stream);
+    echo!("Captured to: {}", temp_path);
+    if is_file(&temp_path) {
+        echo!("Temp file exists.");
+    }
+    // The EXIT trap in bootstrap! should clean this up.
+    0
+}
+
+fn trap_test(_args: Args) -> i32 {
+    set_var("ERROR_COUNT", "0");
+    trap!(|data: &EventData| {
+        let source = data.data.get("source").unwrap();
+        let status = data.data.get("status").unwrap();
+        info!("ERROR TRAP: Command '{}' failed with status {}", source, status);
+        math!("ERROR_COUNT += 1");
+    }, on: "COMMAND_ERROR");
+
+    // This command will fail and trigger the trap
+    shell!("ls /nonexistent-directory");
+
+    echo!("Final error count: $ERROR_COUNT");
+    0
+}
+
+fn random_test(_args: Args) -> i32 {
+    echo!("rand_alnum: {}", rand_alnum!(10));
+    echo!("rand_alpha: {}", rand_alpha!(10));
+    echo!("rand_hex: {}", rand_hex!(10));
+    echo!("rand_string: {}", rand_string!(10));
+    echo!("rand_uuid: {}", rand_uuid!());
+    0
+}
+
+fn dict_test(_args: Args) -> i32 {
+    write_file("test.dict", "apple banana orange");
+    let my_dict = dict!("test.dict");
+    set_array("MY_DICT", &my_dict.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
+    echo!("Random word: {}", rand_dict!("MY_DICT"));
+
+    gen_dict!(alnum, 5, into: "RANDOM_WORDS");
+    echo!("Generated words: $RANDOM_WORDS");
     0
 }
