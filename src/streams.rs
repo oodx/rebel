@@ -150,23 +150,8 @@ impl Stream {
         self
     }
 
-    /// Replaces content within a block of text defined by start and end patterns, using a `sed`-style expression.
-    pub fn sed_block(mut self, start_pattern: &str, end_pattern: &str, sed_expr: &str) -> Self {
-        // Simple parser for "s/pattern/replacement/g"
-        let parts: Vec<&str> = sed_expr.split('/').collect();
-        if parts.len() < 3 || parts[0] != "s" {
-            // Invalid expression, return stream unchanged
-            return self;
-        }
-        let pattern = parts[1];
-        let replacement = parts[2];
-        let is_global = parts.get(3).map_or(false, |&s| s == "g");
-
-        let re = match regex::Regex::new(pattern) {
-            Ok(r) => r,
-            Err(_) => return self, // Invalid regex, return stream unchanged
-        };
-
+    /// Replaces a block of text between two patterns.
+    pub fn sed_block(mut self, start_pattern: &str, end_pattern: &str, replacement: &str) -> Self {
         let mut result_lines = Vec::new();
         let mut buffer = Vec::new();
         let mut in_block = false;
@@ -174,19 +159,14 @@ impl Stream {
         for line in self.lines {
             if !in_block && line.contains(start_pattern) {
                 in_block = true;
+                // The line that starts the block is part of the block
                 buffer.push(line);
             } else if in_block && line.contains(end_pattern) {
                 in_block = false;
                 buffer.push(line);
-
+                // Perform the replacement on the entire block
                 let block_content = buffer.join("\n");
-                let new_content = if is_global {
-                    re.replace_all(&block_content, replacement).to_string()
-                } else {
-                    re.replacen(&block_content, 1, replacement).to_string()
-                };
-
-                result_lines.extend(new_content.lines().map(|s| s.to_string()));
+                result_lines.push(block_content.replace(start_pattern, replacement).replace(end_pattern, ""));
                 buffer.clear();
             } else if in_block {
                 buffer.push(line);
@@ -194,8 +174,7 @@ impl Stream {
                 result_lines.push(line);
             }
         }
-
-        // If the block was never closed, append the buffer as-is.
+        // What if the end pattern is never found? Append the buffer.
         if !buffer.is_empty() {
             result_lines.extend(buffer);
         }

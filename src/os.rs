@@ -159,10 +159,8 @@ pub struct EventData {
 }
 
 lazy_static! {
-
     // A registry for event handlers.
     pub static ref EVENT_HANDLERS: Arc<Mutex<HashMap<String, Vec<Box<dyn Fn(&EventData) + Send + Sync>>>>> =
-
         Arc::new(Mutex::new(HashMap::new()));
 }
 
