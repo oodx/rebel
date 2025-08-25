@@ -353,26 +353,19 @@ fn parse_rsb_colors() {
     if let Ok(rsb_colors) = std::env::var("RSB_COLORS") {
         let mut colors = COLORS.lock().unwrap();
         let mut glyphs = GLYPHS.lock().unwrap();
-
         for part in rsb_colors.split(',') {
             let part = part.trim();
             if let Some((level, config)) = part.split_once(':') {
-                let level = level.trim();
                 let config = config.trim_matches(|c| c == '[' || c == ']');
-
-                let config_parts: Vec<&str> = config.splitn(2, ',').collect();
-                let color_part = config_parts.get(0).map(|s| s.trim()).unwrap_or("");
-                let glyph_part = config_parts.get(1).map(|s| s.trim()).unwrap_or("");
-
-                if !color_part.is_empty() {
-                    // If the color part is a known color name, use its value. Otherwise, use the part as-is.
-                    // This allows `error:[red]` and `error:[\x1b[31m]`.
-                    let color_val = colors.get(color_part).cloned().unwrap_or_else(|| color_part.to_string());
-                    colors.insert(level.to_string(), color_val);
-                }
-
-                if !glyph_part.is_empty() {
-                    glyphs.insert(level.to_string(), glyph_part.to_string());
+                if let Some((color, glyph)) = config.split_once(';') {
+                    colors.insert(level.to_string(), color.to_string());
+                    glyphs.insert(level.to_string(), glyph.to_string());
+                } else if !config.is_empty() {
+                    if config.starts_with("\x1b[") {
+                         colors.insert(level.to_string(), config.to_string());
+                    } else {
+                         glyphs.insert(level.to_string(), config.to_string());
+                    }
                 }
             }
         }
