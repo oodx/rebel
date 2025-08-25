@@ -16,13 +16,16 @@ pub use crate::os::*;
 pub use crate::streams::Stream;
 pub use crate::time::*;
 pub use crate::utils::*;
+pub use crate::random::*;
+pub use crate::math::*;
 
 // Re-export all macros.
 pub use crate::{
-    args, benchmark, bootstrap, case, cat, cmd, date, debug, dispatch, echo, error, event, export,
-    fatal, file_in, get_env, info, job, load_config, meta_key, meta_keys, okay, param,
-
-    path_canon, path_split, pipe, pre_dispatch, printf, rand_range, require_command, require_dir,
-    require_file, require_var, shell, src, stream, str_line, test, trace, trap, validate, warn,
-
+    args, backup, benchmark, bootstrap, case, cap_stream, cat, chmod, clear, cmd, confirm, date,
+    debug, dict, dispatch, echo, error, event, export, fatal, file_in, for_in, get_env, gen_dict,
+    info, job, load_config, math, meta_key, meta_keys, okay, param, path_canon, path_split, pipe,
+    pre_dispatch, printf, prompt, rand_alnum, rand_alpha, rand_dict, rand_hex, rand_range,
+    rand_string, rand_uuid, require_command, require_dir, require_file, require_var, shell, sleep,
+    src, stream, str_explode, str_in, str_len, str_line, str_trim, subst, test, trace, trap,
+    validate, warn,
 };

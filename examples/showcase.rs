@@ -35,7 +35,12 @@ fn main() {
         "path-test" => path_test,
         "file-in-test" => file_in_test,
         "array-test" => array_test,
-        "system-test" => system_test
+        "system-test" => system_test,
+        "math-test" => math_test,
+        "cap-stream-test" => cap_stream_test,
+        "trap-test" => trap_test,
+        "random-test" => random_test,
+        "dict-test" => dict_test
     });
 }
 
@@ -296,5 +301,62 @@ fn file_in_test(args: Args) -> i32 {
     file_in!(file in &dir => {
         echo!("Found file: $file");
     });
+    0
+}
+
+fn math_test(_args: Args) -> i32 {
+    set_var("A", "10");
+    set_var("B", "3.5");
+    math!("C = (A + 5) * B / 2"); // (10 + 5) * 3.5 / 2 = 15 * 3.5 / 2 = 52.5 / 2 = 26.25
+    echo!("C = {}", get_var("C"));
+    math!("C += 1.75");
+    echo!("C += 1.75 -> {}", get_var("C")); // 28.0
+    0
+}
+
+fn cap_stream_test(_args: Args) -> i32 {
+    let mut stream = pipe!("hello\nworld");
+    let temp_path = cap_stream!(stream);
+    echo!("Captured to: {}", temp_path);
+    if is_file(&temp_path) {
+        echo!("Temp file exists.");
+    }
+    // The EXIT trap in bootstrap! should clean this up.
+    0
+}
+
+fn trap_test(_args: Args) -> i32 {
+    set_var("ERROR_COUNT", "0");
+    trap!(|data: &EventData| {
+        let source = data.data.get("source").unwrap();
+        let status = data.data.get("status").unwrap();
+        info!("ERROR TRAP: Command '{}' failed with status {}", source, status);
+        math!("ERROR_COUNT += 1");
+    }, on: "COMMAND_ERROR");
+
+    // This command will fail and trigger the trap
+    shell!("ls /nonexistent-directory");
+
+    echo!("Final error count: $ERROR_COUNT");
+    0
+}
+
+fn random_test(_args: Args) -> i32 {
+    echo!("rand_alnum: {}", rand_alnum!(10));
+    echo!("rand_alpha: {}", rand_alpha!(10));
+    echo!("rand_hex: {}", rand_hex!(10));
+    echo!("rand_string: {}", rand_string!(10));
+    echo!("rand_uuid: {}", rand_uuid!());
+    0
+}
+
+fn dict_test(_args: Args) -> i32 {
+    write_file("test.dict", "apple banana orange");
+    let my_dict = dict!("test.dict");
+    set_array("MY_DICT", &my_dict.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
+    echo!("Random word: {}", rand_dict!("MY_DICT"));
+
+    gen_dict!(alnum, 5, into: "RANDOM_WORDS");
+    echo!("Generated words: $RANDOM_WORDS");
     0
 }

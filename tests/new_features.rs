@@ -55,3 +55,52 @@ fn test_path_split_macro() {
         .stdout(predicate::str::contains("Parent: /tmp/some"))
         .stdout(predicate::str::contains("Filename: file.txt"));
 }
+
+#[test]
+fn test_math_macro() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("math-test");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("C = 26.25"))
+        .stdout(predicate::str::contains("C += 1.75 -> 28"));
+}
+
+#[test]
+fn test_cap_stream_macro() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("cap-stream-test");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Temp file exists."));
+}
+
+#[test]
+fn test_trap_on_err() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("trap-test");
+    cmd.assert()
+        .success()
+        .stderr(predicate::str::contains("ERROR TRAP: Command 'shell!' failed with status"))
+        .stdout(predicate::str::contains("Final error count: 1"));
+}
+
+#[test]
+fn test_random_macros() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("random-test");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::is_match(r"^rand_alnum: .{10}\n").unwrap())
+        .stdout(predicate::str::is_match(r"rand_uuid: ........-....-....-....-............\n").unwrap());
+}
+
+#[test]
+fn test_dict_macros() {
+    let mut cmd = get_example_cmd();
+    cmd.arg("dict-test");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Random word:"))
+        .stdout(predicate::str::contains("Generated words:"));
+}
