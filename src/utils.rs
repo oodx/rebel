@@ -15,50 +15,55 @@ pub fn should_print_level(level: &str) -> bool {
         "debug" => has_var("DEBUG_MODE") || has_var("TRACE_MODE"),
         "info" | "warn" | "okay" => has_var("DEBUG_MODE") || has_var("DEV_MODE") || has_var("TRACE_MODE"),
         "error" | "fatal" => true,
-
         _ => true,
-    }
-}
-pub fn expand_colors(text: &str) -> String {
-    let mut result = text.to_string();
-    let colors = COLORS.lock().unwrap();
-    let reset_code = colors.get("reset").cloned().unwrap_or_else(|| "\x1b[0m".to_string());
-
-        _ => true, // Default to printing unknown levels
     }
 }
 
 /// Replaces color placeholders (e.g., `{red}`) with ANSI color codes.
 pub fn expand_colors(text: &str) -> String {
-    let mut result = text.to_string();
     let colors = COLORS.lock().unwrap();
-    // Also get the reset code to append at the end
+    let re = regex::Regex::new(r"\{([a-zA-Z]+)\}").unwrap();
+
+    // Replace all {color} placeholders with their ANSI codes.
+    let result = re.replace_all(text, |caps: &regex::Captures| {
+        let color_name = &caps[1];
+        colors.get(color_name).cloned().unwrap_or_default()
+    }).to_string();
+
+    // Ensure the string ends with a reset code if it contains any ANSI codes.
     let reset_code = colors.get("reset").cloned().unwrap_or_else(|| "\x1b[0m".to_string());
-
-    //todo: is this correct?    
-    result = result.replace("{reset}", &reset_code);
-
     if result.contains('\x1b') && !result.ends_with(&reset_code) {
-        result.push_str(&reset_code);
+        format!("{}{}", result, reset_code)
+    } else {
+        result
     }
-    result
 }
 
 pub fn glyph_stderr(level: &str, message: &str) {
     if !should_print_level(level) { return; }
     let glyphs = GLYPHS.lock().unwrap();
-    let glyph = glyphs.get(level).cloned().unwrap_or_else(|| "•".to_string());
     let colors = COLORS.lock().unwrap();
-    let color_name = match level {
-        "info" => "cyan", "okay" => "green", "warn" => "yellow",
-        "error" | "fatal" => "red", "debug" => "grey", "trace" => "magenta",
-        _ => "reset",
-    };
-    let color_code = colors.get(color_name).cloned().unwrap_or_default();
 
-    let expanded_msg = expand_vars(message);
-    let final_msg = format!("{}{}{}", color_code, glyph, expanded_msg);
-    eprintln!("{}", expand_colors(&final_msg));
+    let glyph = glyphs.get(level).cloned().unwrap_or_else(|| "•".to_string());
+
+    // Check if a specific color is defined for this level.
+    let color_name = if colors.contains_key(level) {
+        level
+    } else {
+        // Fallback to default color mapping.
+        match level {
+            "info" => "cyan", "okay" => "green", "warn" => "yellow",
+            "error" | "fatal" => "red", "debug" => "grey", "trace" => "magenta",
+            _ => "reset",
+        }
+    };
+
+    // Construct a format string with placeholders
+    let format_string = format!("{{{}}}{} {}", color_name, glyph, message);
+
+    // Expand variables and then colors
+    let expanded_vars = expand_vars(&format_string);
+    eprintln!("{}", expand_colors(&expanded_vars));
 }
 
 

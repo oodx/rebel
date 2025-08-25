@@ -6,6 +6,7 @@
 // --- Command Execution ---
 use crate::context::expand_vars;
 use std::process::Command;
+use std::sync::{Arc, Mutex};
 
 /// The result of a command execution, containing status, stdout, and stderr.
 #[derive(Debug, Clone)]
@@ -41,8 +42,7 @@ pub fn run_cmd_with_status(cmd: &str) -> CmdResult {
 pub fn run_cmd(cmd: &str) -> String {
     let result = run_cmd_with_status(cmd);
     if result.status != 0 {
-        // Using the error! macro from the crate itself to report.
-        // This is a bit recursive, but it's the RSB way.
+        crate::event!(emit "COMMAND_ERROR", "source" => "cmd!", "command" => cmd, "status" => &result.status.to_string(), "stderr" => &result.error);
         eprintln!("Command failed: {}", cmd);
         eprintln!("Stderr: {}", result.error);
         std::process::exit(result.status);
@@ -51,26 +51,15 @@ pub fn run_cmd(cmd: &str) -> String {
 }
 
 /// Executes a shell command and captures its output, similar to `$(...)` in bash.
-pub fn shell_exec(cmd: &str, silent: bool) -> Result<String, String> {
-    let expanded_cmd = expand_vars(cmd);
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(&expanded_cmd)
-        .output();
-
-    match output {
-        Ok(out) => {
-            if out.status.success() {
-                Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
-            } else {
-                if !silent {
-                    let stderr = String::from_utf8_lossy(&out.stderr);
-                    return Err(format!("Command failed with status {}: {}", out.status, stderr));
-                }
-                Err(format!("Command failed with status {}", out.status))
-            }
+pub fn shell_exec(cmd: &str, silent: bool) -> Result<String, CmdResult> {
+    let result = run_cmd_with_status(cmd);
+    if result.status == 0 {
+        Ok(result.output.trim().to_string())
+    } else {
+        if !silent {
+            // The error message is now part of the CmdResult.
         }
-        Err(e) => Err(e.to_string()),
+        Err(result)
     }
 }
 
@@ -78,33 +67,63 @@ pub fn shell_exec(cmd: &str, silent: bool) -> Result<String, String> {
 // --- Job Control ---
 
 use std::thread;
-
-pub enum JobStatus {
-    Running,
-    Completed(i32),
-}
+use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 pub struct JobHandle {
     pub id: u32,
     pub command: String,
-    pub handle: thread::JoinHandle<CmdResult>,
-    pub status: Arc<Mutex<JobStatus>>,
+    pub handle: Option<thread::JoinHandle<()>>,
+    pub rx: std::sync::mpsc::Receiver<CmdResult>,
 }
 
 lazy_static! {
-    pub(crate) static ref JOBS: Arc<Mutex<HashMap<u32, Arc<Mutex<JobHandle>>>>> =
+    pub static ref JOBS: Arc<Mutex<HashMap<u32, Arc<Mutex<JobHandle>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
-    pub(crate) static ref JOB_COUNTER: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+    pub static ref JOB_COUNTER: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+}
+
+/// Waits for a specific job to complete and returns its exit status.
+/// This function will remove the job from the global JOBS map.
+pub fn wait_on_job(job_id: u32, timeout: Option<std::time::Duration>) -> Result<CmdResult, String> {
+    let job_arc = JOBS.lock().unwrap().remove(&job_id);
+
+    if let Some(job_arc) = job_arc {
+        if let Ok(job_handle) = Arc::try_unwrap(job_arc).map(|mutex| mutex.into_inner().unwrap()) {
+
+            let result = if let Some(t) = timeout {
+                job_handle.rx.recv_timeout(t)
+            } else {
+                job_handle.rx.recv().map_err(|_| std::sync::mpsc::RecvTimeoutError::Disconnected)
+            };
+
+            return match result {
+                Ok(cmd_result) => {
+                    if let Some(h) = job_handle.handle {
+                        let _ = h.join(); // Join only on success
+                    }
+                    Ok(cmd_result)
+                },
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    // On timeout, we don't join the handle. The job is orphaned.
+                    Err("Timeout".to_string())
+                },
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    if let Some(h) = job_handle.handle {
+                        let _ = h.join(); // Join on disconnect
+                    }
+                    Err("Job channel disconnected".to_string())
+                },
+            };
+        }
+    }
+
+    Err(format!("Job {} not found", job_id))
 }
 
 
 // --- Event System ---
-use lazy_static::lazy_static;
-use std::collections::HashMap;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 // --- Signal Handling ---
 static TRAP_INSTALLED: AtomicBool = AtomicBool::new(false);
@@ -116,17 +135,11 @@ extern "C" fn signal_handler(signal: i32) {
         libc::SIGTERM => "SIGTERM",
         _ => "UNKNOWN_SIGNAL",
     };
-    // It's not safe to do much in a signal handler.
-    // We can't allocate memory (like creating EventData) or lock mutexes.
-    // The best we can do is set a flag and have the main loop check it.
-    // For now, we will just print a message and exit, which is one of the few safe operations.
     eprintln!("\nrsb-trap: Caught signal {}, exiting.", event_name);
-    // A more robust implementation would use a global atomic flag.
     std::process::exit(128 + signal);
 }
 
 /// Installs the signal handlers for common termination signals.
-/// This is done only once.
 pub fn install_signal_handlers() {
     if TRAP_INSTALLED
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -147,7 +160,7 @@ pub struct EventData {
 
 lazy_static! {
     // A registry for event handlers.
-    pub(crate) static ref EVENT_HANDLERS: Arc<Mutex<HashMap<String, Vec<Box<dyn Fn(&EventData) + Send + Sync>>>>> =
+    pub static ref EVENT_HANDLERS: Arc<Mutex<HashMap<String, Vec<Box<dyn Fn(&EventData) + Send + Sync>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
 }
 
@@ -193,7 +206,6 @@ pub fn get_os() -> String {
 
 /// Checks if a command is available in the system's PATH.
 pub fn is_command(cmd: &str) -> bool {
-    // Try `which` first, as it's common.
     if std::process::Command::new("which")
         .arg(cmd)
         .stdout(std::process::Stdio::null())
@@ -205,7 +217,6 @@ pub fn is_command(cmd: &str) -> bool {
         return true;
     }
 
-    // Fallback to `command -v`, which is a POSIX standard.
     if std::process::Command::new("command")
         .arg("-v")
         .arg(cmd)

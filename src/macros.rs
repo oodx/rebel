@@ -7,6 +7,10 @@ macro_rules! bootstrap {
         let args: Vec<String> = std::env::args().collect();
         $crate::get_env!();
         $crate::context::rsb_bootstrap(&args);
+        // Register a trap to clean up temp files on exit.
+        $crate::trap!(|_: &$crate::os::EventData| {
+            $crate::fs::cleanup_temp_files();
+        }, on: "EXIT");
         args
     }};
 }
@@ -91,9 +95,16 @@ macro_rules! stream {
 #[macro_export]
 macro_rules! shell {
     ($($arg:tt)*) => {
-        match $crate::os::shell_exec(&format!($($arg)*), false) {
-            Ok(output) => output,
-            Err(e) => { $crate::fatal!("Shell command failed: {}", e); std::process::exit(1); }
+        {
+            let cmd_str = format!($($arg)*);
+            match $crate::os::shell_exec(&cmd_str, false) {
+                Ok(output) => output,
+                Err(res) => {
+                    $crate::event!(emit "COMMAND_ERROR", "source" => "shell!", "command" => &cmd_str, "status" => &res.status.to_string(), "stderr" => &res.error);
+                    $crate::fatal!("Shell command failed: {}", cmd_str);
+                    std::process::exit(res.status);
+                }
+            }
         }
     };
     ($($arg:tt)*, silent) => {
@@ -112,37 +123,43 @@ macro_rules! job {
         *counter += 1;
         let job_id = *counter;
         let cmd_string = $command.to_string();
-        let job_status = std::sync::Arc::new(std::sync::Mutex::new($crate::os::JobStatus::Running));
-        let status_clone = job_status.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let cmd_string_for_thread = cmd_string.clone();
+
         let handle = std::thread::spawn(move || {
-            let result = $crate::os::run_cmd_with_status(&cmd_string);
-            let mut status = status_clone.lock().unwrap();
-            *status = $crate::os::JobStatus::Completed(result.status);
-            result
+            let result = $crate::os::run_cmd_with_status(&cmd_string_for_thread);
+            let _ = tx.send(result);
         });
+
         let job_handle = $crate::os::JobHandle {
             id: job_id,
             command: cmd_string,
-            handle,
-            status: job_status,
+            handle: Some(handle),
+            rx: rx,
         };
         $crate::os::JOBS.lock().unwrap().insert(job_id, std::sync::Arc::new(std::sync::Mutex::new(job_handle)));
         $crate::info!("[{}] Started background job", job_id);
         job_id
     }};
     (wait: $job_id:expr) => {{
-        let job_arc = $crate::os::JOBS.lock().unwrap().remove(&$job_id);
-        if let Some(job_mutex) = job_arc {
-
-             //todo: is this correct?
-            let job = job_mutex.lock().unwrap();
-
-
-            $crate::info!("[{}] Waiting for job to complete...", $job_id);
-            -1
-        } else {
-            $crate::error!("Job {} not found", $job_id);
-            -1
+        $crate::info!("[{}] Waiting for job to complete...", $job_id);
+        match $crate::os::wait_on_job($job_id, None) {
+            Ok(result) => result.status,
+            Err(e) => {
+                $crate::error!("Failed to wait for job {}: {}", $job_id, e);
+                -1
+            }
+        }
+    }};
+    (timeout: $timeout:expr, wait: $job_id:expr) => {{
+        $crate::info!("[{}] Waiting for job to complete (timeout: {}s)...", $job_id, $timeout);
+        let timeout_duration = std::time::Duration::from_secs($timeout);
+        match $crate::os::wait_on_job($job_id, Some(timeout_duration)) {
+            Ok(result) => result.status,
+            Err(e) => {
+                $crate::error!("Failed to wait for job {}: {}", $job_id, e);
+                -1
+            }
         }
     }};
     (list) => {{
@@ -152,8 +169,8 @@ macro_rules! job {
         } else {
             $crate::info!("Running jobs:");
             for (id, job_mutex) in jobs.iter() {
-                 let job = job_mutex.lock().unwrap();
-                 $crate::echo!("[{}] {}", id, job.command);
+                let job = job_mutex.lock().unwrap();
+                $crate::echo!("[{}] {}", id, job.command);
             }
         }
     }};
@@ -183,7 +200,7 @@ macro_rules! trap {
     ($handler:expr, on: $signal:expr) => {{
         let sig_name = $signal.to_uppercase();
         match sig_name.as_str() {
-            "SIGINT" | "SIGTERM" | "EXIT" => {
+            "SIGINT" | "SIGTERM" | "EXIT" | "COMMAND_ERROR" => {
                 $crate::os::install_signal_handlers();
                 $crate::event!(register &sig_name, $handler);
             }
@@ -294,70 +311,6 @@ macro_rules! sleep {
 macro_rules! str_line {
     ($char:expr, $count:expr) => { $char.to_string().repeat($count) };
 }
-#[macro_export]
-macro_rules! chmod {
-    ($path:expr, $mode:expr) => { $crate::fs::chmod($path, $mode).ok() };
-}
-#[macro_export]
-macro_rules! backup {
-    ($path:expr, $suffix:expr) => { $crate::fs::backup_file($path, $suffix).ok() };
-}
-
-
-
-// --- System & Random Macros ---
-
-/// Generates a random number in a given range.
-#[macro_export]
-macro_rules! rand_range {
-    ($min:expr, $max:expr) => {
-        {
-            use rand::Rng;
-            rand::thread_rng().gen_range($min..=$max)
-        }
-    };
-}
-
-/// Clears the terminal screen.
-#[macro_export]
-macro_rules! clear {
-    () => {
-        print!("\x1B[2J\x1B[1;1H");
-    };
-}
-
-/// Pauses execution for a number of seconds or milliseconds.
-#[macro_export]
-macro_rules! sleep {
-    ($seconds:expr) => {
-        std::thread::sleep(std::time::Duration::from_secs($seconds))
-    };
-    (ms: $ms:expr) => {
-        std::thread::sleep(std::time::Duration::from_millis($ms))
-    };
-}
-
-/// Creates a string by repeating a character.
-#[macro_export]
-macro_rules! str_line {
-    ($char:expr, $count:expr) => {
-        $char.to_string().repeat($count)
-    };
-}
-#[macro_export]
-macro_rules! chmod {
-    ($path:expr, $mode:expr) => {
-        $crate::fs::chmod($path, $mode).ok()
-    };
-}
-
-#[macro_export]
-macro_rules! backup {
-    ($path:expr, $suffix:expr) => {
-        $crate::fs::backup_file($path, $suffix).ok()
-    };
-}
-
 
 // --- Meta & Path Macros ---
 #[macro_export]
@@ -581,7 +534,7 @@ macro_rules! str_len {
     };
 }
 
-// --- File System Macros ---
+// --- File System & Temp Macros ---
 #[macro_export]
 macro_rules! chmod {
     ($path:expr, $mode:expr) => {
@@ -594,4 +547,122 @@ macro_rules! backup {
         $crate::fs::backup_file($path, $suffix).ok()
     };
 }
+#[macro_export]
+macro_rules! tmp {
+    () => {
+        $crate::fs::create_temp_file_path("random")
+    };
+    ($type:ident) => {
+        $crate::fs::create_temp_file_path(stringify!($type))
+    };
+}
 
+// --- Process Substitution ---
+#[macro_export]
+macro_rules! cap_stream {
+    ($stream:expr) => {
+        $crate::fs::capture_stream_to_temp_file(&mut $stream)
+    };
+}
+#[macro_export]
+macro_rules! subst {
+    ($stream:expr) => {
+        $crate::cap_stream!($stream)
+    };
+}
+
+// --- Math Macros ---
+#[macro_export]
+macro_rules! math {
+    ($expr:expr) => {
+        match $crate::math::evaluate_expression($expr) {
+            Ok(_) => {},
+            Err(e) => {
+                $crate::error!("Math expression failed: {}", e);
+            }
+        }
+    };
+}
+
+// --- Dictionary Macros ---
+#[macro_export]
+macro_rules! dict {
+    ($path:expr) => {
+        $crate::fs::load_dict_from_file($path)
+    };
+}
+
+#[macro_export]
+macro_rules! rand_dict {
+    ($arr_name:expr) => {
+        $crate::random::get_rand_from_slice(&$crate::utils::get_array($arr_name)).unwrap_or_default()
+    };
+    ($arr_name:expr, $n:expr) => {
+        $crate::rand_dict!($arr_name, $n, " ")
+    };
+    ($arr_name:expr, $n:expr, $delim:expr) => {{
+        let words = $crate::utils::get_array($arr_name);
+        if words.is_empty() {
+            String::new()
+        } else {
+            let mut result = Vec::new();
+            for _ in 0..$n {
+                result.push($crate::random::get_rand_from_slice(&words).unwrap_or_default());
+            }
+            result.join($delim)
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! gen_dict {
+    ($type:ident, $n:expr, into: $arr_name:expr) => {{
+        let mut words = Vec::new();
+        for _ in 0..$n {
+            // A bit of a hack to generate a random word length between 4 and 8
+            let len = $crate::rand_range!(4, 8);
+            let word = match stringify!($type) {
+                "alnum" => $crate::random::get_rand_alnum(len),
+                "alpha" => $crate::random::get_rand_alpha(len),
+                "hex" => $crate::random::get_rand_hex(len),
+                "string" => $crate::random::get_rand_string(len),
+                _ => String::new(),
+            };
+            words.push(word);
+        }
+        let word_strs: Vec<&str> = words.iter().map(|s| s.as_str()).collect();
+        $crate::utils::set_array($arr_name, &word_strs);
+    }};
+}
+
+// --- Random Data Macros ---
+#[macro_export]
+macro_rules! rand_alnum {
+    ($n:expr) => {
+        $crate::random::get_rand_alnum($n)
+    };
+}
+#[macro_export]
+macro_rules! rand_alpha {
+    ($n:expr) => {
+        $crate::random::get_rand_alpha($n)
+    };
+}
+#[macro_export]
+macro_rules! rand_hex {
+    ($n:expr) => {
+        $crate::random::get_rand_hex($n)
+    };
+}
+#[macro_export]
+macro_rules! rand_string {
+    ($n:expr) => {
+        $crate::random::get_rand_string($n)
+    };
+}
+#[macro_export]
+macro_rules! rand_uuid {
+    () => {
+        $crate::random::get_rand_uuid()
+    };
+}
