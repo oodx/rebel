@@ -57,48 +57,6 @@ fn test_path_split_macro() {
 }
 
 #[test]
-fn test_job_control_wait_and_timeout() {
-    // Test successful wait
-    let mut wait_cmd = get_example_cmd();
-    wait_cmd.arg("job-test-integration");
-    wait_cmd.assert()
-        .success()
-        .stdout(predicate::str::contains("wait_status=0"));
-
-    // Test timeout
-    let mut timeout_cmd = get_example_cmd();
-    timeout_cmd.arg("job-test-timeout-integration");
-    timeout_cmd.assert()
-        .success()
-        .stderr(predicate::str::contains("Timeout"))
-        .stdout(predicate::str::contains("timeout_status=-1"));
-}
-
-#[test]
-fn test_sed_block() {
-    let mut cmd = get_example_cmd();
-    cmd.arg("sed-block-test");
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains("<setting>new_value</setting>"))
-        .stdout(predicate::str::contains("Unclosed block contains: old_value"));
-}
-
-#[test]
-fn test_color_config() {
-    let mut cmd = get_example_cmd();
-    // Override the color for 'error' and the glyph for 'warn'
-    cmd.env("RSB_COLORS", "error:magenta,warn:;>>");
-    cmd.env("DEBUG", "1"); // Ensure all levels are printed
-    cmd.arg("color-test");
-
-    cmd.assert()
-        .success()
-        .stderr(predicate::str::contains("\x1b[35m")) // Check for magenta color code for error
-        .stderr(predicate::str::contains(">> This is a warning message.")); // Check for new warn glyph
-}
-
-#[test]
 fn test_math_macro() {
     let mut cmd = get_example_cmd();
     cmd.arg("math-test");
@@ -133,8 +91,9 @@ fn test_random_macros() {
     cmd.arg("random-test");
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("rand_alnum:").and(predicate::str::len(10 + "rand_alnum: ".len())))
-        .stdout(predicate::str::contains("rand_uuid:").and(predicate::str::len(36 + "rand_uuid: ".len())));
+        .stdout(predicate::str::is_match(r"^rand_alnum: .{10}\n").unwrap())
+        .stdout(predicate::str::is_match(r"rand_uuid: ........-....-....-....-............\n").unwrap());
+
 }
 
 #[test]

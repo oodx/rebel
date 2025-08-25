@@ -15,7 +15,6 @@ pub fn should_print_level(level: &str) -> bool {
         "debug" => has_var("DEBUG_MODE") || has_var("TRACE_MODE"),
         "info" | "warn" | "okay" => has_var("DEBUG_MODE") || has_var("DEV_MODE") || has_var("TRACE_MODE"),
         "error" | "fatal" => true,
-
         _ => true,
     }
 }

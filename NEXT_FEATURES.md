@@ -25,7 +25,7 @@ This document tracks the next set of features planned for the RSB library.
   - `rand_alnum!(n)`
   - `rand_alpha!(n)`
   - `rand_hex!(n)`
-  - `rand_string!(n)` (printable, non-whitespace)
+  - `rand_string!(n)`
   - `rand_uuid!`
 - **Dictionary Macros**: Utilities for working with word lists.
   - `dict!(<filepath>)`: Loads a newline or space-delimited file into an RSB array.
