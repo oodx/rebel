@@ -319,21 +319,32 @@ ARRAY=(item1 item2 "item 3")
     }
 }
 fn setup_xdg_paths() {
+    // XDG(0) - Standard XDG Base Directory Specification
+    set_var("XDG_CONFIG_HOME", &expand_vars("${XDG_CONFIG_HOME:-$HOME/.config}"));
+    set_var("XDG_CACHE_HOME", &expand_vars("${XDG_CACHE_HOME:-$HOME/.cache}"));
+    set_var("XDG_DATA_HOME", &expand_vars("${XDG_DATA_HOME:-$HOME/.local/share}"));
+    
+    // XDG(1) - BashFX XDG+ Extensions using proper _HOME pattern
     set_var("XDG_HOME", &expand_vars("$HOME/.local"));
-    set_var("XDG_LIB", &expand_vars("$XDG_HOME/lib"));
-    set_var("XDG_ETC", &expand_vars("$XDG_HOME/etc"));
-    set_var("XDG_BIN", &expand_vars("$XDG_HOME/bin"));
-    set_var("XDG_DATA", &expand_vars("$XDG_HOME/data"));
+    set_var("XDG_LIB_HOME", &expand_vars("$XDG_HOME/lib"));
+    set_var("XDG_ETC_HOME", &expand_vars("$XDG_HOME/etc")); 
+    set_var("XDG_BIN_HOME", &expand_vars("$XDG_HOME/bin"));
+    set_var("XDG_DATA_HOME", &expand_vars("$XDG_HOME/data"));  // Override XDG(0) for BashFX preference
     set_var("XDG_TMP", &expand_vars("$HOME/.cache/tmp"));
 }
 fn setup_rsb_paths() {
-    set_var("RSB_LIB", &expand_vars("$XDG_LIB/rsb"));
-    set_var("RSB_BIN", &expand_vars("$XDG_BIN/rsb"));
-    set_var("RSB_ETC", &expand_vars("$XDG_ETC/rsb"));
-    set_var("RSB_DATA", &expand_vars("$XDG_DATA/rsb"));
-    set_var("ODX_LIB", &expand_vars("$XDG_LIB/odx"));
-    set_var("ODX_BIN", &expand_vars("$XDG_BIN/odx"));
-    set_var("RSB_EXPORT", &expand_vars("$RSB_ETC/export.env"));
+    // RSB library provides standard paths for RSB tools (not forced, just available)
+    // Individual RSB tools can use these or define their own namespacing
+    
+    // Standard RSB tool namespace (tools can opt-in)
+    set_var("RSB_LIB_HOME", &expand_vars("$XDG_LIB_HOME/rsb"));
+    set_var("RSB_ETC_HOME", &expand_vars("$XDG_ETC_HOME"));  // RSB configs go in etc root
+    set_var("RSB_DATA_HOME", &expand_vars("$XDG_DATA_HOME/rsb"));
+    
+    // BashFX pattern: binaries from lib/namespace get flattened into bin/namespace
+    // $RSB_LIB_HOME/mytool/mytool -> $XDG_BIN_HOME/rsb/mytool (flattened into rsb namespace)
+    set_var("RSB_BIN_HOME", &expand_vars("$XDG_BIN_HOME/rsb"));  // Links go to bin/rsb/
+    
 }
 fn setup_standard_modes() {
     if std::env::var("DEBUG").is_ok() {
@@ -402,6 +413,24 @@ pub fn rsb_bootstrap(args: &[String]) {
     parse_rsb_colors();
     setup_xdg_paths();
     setup_rsb_paths();
+    ensure_xdg_directories();  // Auto-create XDG+ directories
     setup_standard_modes();
     setup_script_awareness(args);
+}
+
+// Auto-create XDG+ directories during bootstrap
+fn ensure_xdg_directories() {
+    use crate::fs::mkdir_p;
+    
+    let xdg_dirs = [
+        "XDG_LIB_HOME", "XDG_ETC_HOME", "XDG_BIN_HOME", 
+        "XDG_DATA_HOME", "XDG_TMP"
+    ];
+    
+    for dir_var in &xdg_dirs {
+        let dir_path = get_var(dir_var);
+        if !dir_path.is_empty() {
+            mkdir_p(&dir_path);
+        }
+    }
 }
