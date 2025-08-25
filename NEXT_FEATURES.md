@@ -45,9 +45,9 @@ This document tracks potential features and improvements for future versions of 
 - **Description:** The `param!` macro's prefix/suffix removal (`#`, `##`, `%`, `%%`) currently uses simple string matching. It should support shell-style glob patterns.
 - **Example:** `param!("FILENAME", suffix: "*.log")`
 
-### 8. `rsb_stderr!` Macro
+### 8. `colored!` Macro
 - **Description:** A dedicated macro for color/glyph parsing, allowing users to easily format their own strings without necessarily printing to `stderr`.
-- **Example:** `let formatted = rsb_stderr!("{red}My custom error{reset}");`
+- **Example:** `let formatted = colored!("{red}My custom error{reset}");`
 
 ## Low Priority / Ideas
 
@@ -55,7 +55,27 @@ This document tracks potential features and improvements for future versions of 
 - **Description:** Currently, command execution relies on a `sh`-compatible shell. Add support for native Windows `cmd.exe` or `PowerShell` to improve portability. This would likely involve conditional compilation (`#[cfg(windows)]`). The `libc` dependency for signal handling would also need a Windows equivalent (`winapi`).
 
 ### 10. Official Testing Framework / Patterns
-- **Description:** Document official patterns and provide helper functions for testing RSB scripts, especially for mocking file system or command execution.
+- **Description:** Document official patterns and provide helper functions for testing RSB scripts. A potential implementation could include:
+  - **`rsb_test!` macro**: A test harness that creates an isolated RSB context for each test.
+  - **`mock_fs!` macro**: A way to define a virtual filesystem for a test's duration, avoiding disk I/O and improving test speed and reliability.
+    ```rust
+    rsb_test!("test file processing" => {
+        mock_fs!({
+            "data/users.csv" => "id,name\n1,alice\n2,bob"
+        });
+        // ... test logic ...
+    });
+    ```
+  - **`mock_cmd!` macro**: A way to mock the output of `cmd!` and `shell!` calls to prevent running real, slow, or destructive commands.
+    ```rust
+    rsb_test!("test git status" => {
+        mock_cmd!({
+            "git status --porcelain" => " M src/lib.rs"
+        });
+        // ... test logic ...
+    });
+    ```
+  - **Fluent Assertions**: A set of assertion macros that feel native to RSB, like `assert_var!("VAR", ==, "value")` or `assert_file_contains!("file.txt", "content")`.
 
 ### 11. Robust `cp -r` Fallback
 - **Description:** The current `cp_r` fallback is very basic. A more robust, native Rust implementation could be provided for systems that don't have a `cp` command.
