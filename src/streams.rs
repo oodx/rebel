@@ -183,6 +183,94 @@ impl Stream {
         self
     }
 
+    /// Returns lines between two line numbers (1-indexed, inclusive).
+    pub fn sed_lines(mut self, start_line: usize, end_line: usize) -> Self {
+        if start_line == 0 || end_line == 0 || start_line > end_line {
+            self.lines.clear();
+            return self;
+        }
+        
+        let start_idx = start_line.saturating_sub(1);
+        let end_idx = std::cmp::min(end_line, self.lines.len());
+        
+        if start_idx >= self.lines.len() {
+            self.lines.clear();
+        } else {
+            self.lines = self.lines[start_idx..end_idx].to_vec();
+        }
+        self
+    }
+
+    /// Returns N lines before and after a matching string.
+    pub fn sed_around(mut self, pattern: &str, context_lines: usize) -> Self {
+        let mut result_lines = Vec::new();
+        let total_lines = self.lines.len();
+        
+        for (i, line) in self.lines.iter().enumerate() {
+            if line.contains(pattern) {
+                // Calculate range with context
+                let start_idx = i.saturating_sub(context_lines);
+                let end_idx = std::cmp::min(i + context_lines + 1, total_lines);
+                
+                // Add context lines
+                for j in start_idx..end_idx {
+                    if j < total_lines {
+                        result_lines.push(self.lines[j].clone());
+                    }
+                }
+            }
+        }
+        
+        // Remove duplicates while preserving order
+        let mut unique_lines = Vec::new();
+        let mut seen_lines = std::collections::HashSet::new();
+        
+        for line in result_lines {
+            if seen_lines.insert(line.clone()) {
+                unique_lines.push(line);
+            }
+        }
+        result_lines = unique_lines;
+        
+        self.lines = result_lines;
+        self
+    }
+
+    /// Inserts content at a unique sentinel location. Errors if sentinel is not unique.
+    pub fn sed_insert(mut self, content: &str, sentinel: &str) -> Result<Self, String> {
+        let matches: Vec<usize> = self.lines
+            .iter()
+            .enumerate()
+            .filter(|(_, line)| line.contains(sentinel))
+            .map(|(i, _)| i)
+            .collect();
+            
+        if matches.is_empty() {
+            return Err(format!("Sentinel '{}' not found", sentinel));
+        }
+        
+        if matches.len() > 1 {
+            return Err(format!("Sentinel '{}' found {} times, must be unique", sentinel, matches.len()));
+        }
+        
+        let insert_idx = matches[0];
+        let content_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        
+        // Replace the sentinel line with the content
+        self.lines.splice(insert_idx..=insert_idx, content_lines);
+        Ok(self)
+    }
+
+    /// Replaces all occurrences of a sentinel with content (template mode).
+    pub fn sed_template(mut self, content: &str, sentinel: &str) -> Self {
+        for line in &mut self.lines {
+            if line.contains(sentinel) {
+                *line = line.replace(sentinel, content);
+            }
+        }
+        self
+    }
+
 
     /// Pipes the stream's content as stdin to another shell command.
     pub fn pipe_to_cmd(self, command: &str) -> Self {

@@ -93,14 +93,14 @@ macro_rules! stream {
     (delimited: $content:expr, on: $delim:expr) => { $crate::streams::Stream::from_delimited_string($content, $delim) };
 }
 #[macro_export]
-macro_rules! shell {
+macro_rules! run {
     ($($arg:tt)*) => {
         {
             let cmd_str = format!($($arg)*);
             match $crate::os::shell_exec(&cmd_str, false) {
                 Ok(output) => output,
                 Err(res) => {
-                    $crate::event!(emit "COMMAND_ERROR", "source" => "shell!", "command" => &cmd_str, "status" => &res.status.to_string(), "stderr" => &res.error);
+                    $crate::event!(emit "COMMAND_ERROR", "source" => "run!", "command" => &cmd_str, "status" => &res.status.to_string(), "stderr" => &res.error);
                     $crate::fatal!("Shell command failed: {}", cmd_str);
                     std::process::exit(res.status);
                 }
@@ -111,6 +111,66 @@ macro_rules! shell {
         match $crate::os::shell_exec(&format!($($arg)*), true) {
             Ok(output) => output,
             Err(_) => String::new(),
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! shell {
+    ($($arg:tt)*) => {
+        {
+            let cmd_str = format!($($arg)*);
+            $crate::os::run_cmd_with_status(&cmd_str)
+        }
+    };
+}
+
+// --- I/O Macros ---
+#[macro_export]
+macro_rules! readline {
+    () => {
+        {
+            let mut input = String::new();
+            match std::io::stdin().read_line(&mut input) {
+                Ok(_) => input.trim().to_string(),
+                Err(_) => String::new(),
+            }
+        }
+    };
+    ($prompt:expr) => {
+        {
+            eprint!("{}", $prompt);
+            let _ = std::io::stderr().flush();
+            let mut input = String::new();
+            match std::io::stdin().read_line(&mut input) {
+                Ok(_) => input.trim().to_string(),
+                Err(_) => String::new(),
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! stderr {
+    ($($arg:tt)*) => {
+        {
+            let msg = format!($($arg)*);
+            eprintln!("{}", msg);
+        }
+    };
+}
+
+
+#[macro_export]
+macro_rules! to_number {
+    ($text:expr) => {
+        {
+            $text.trim().parse::<i32>().unwrap_or(0)
+        }
+    };
+    ($text:expr, default: $default:expr) => {
+        {
+            $text.trim().parse::<i32>().unwrap_or($default)
         }
     };
 }
@@ -581,6 +641,436 @@ macro_rules! math {
                 $crate::error!("Math expression failed: {}", e);
             }
         }
+    };
+}
+
+// --- Advanced Sed Macros ---
+#[macro_export]
+macro_rules! sed_lines {
+    ($content:expr, $start:expr, $end:expr) => {
+        $crate::streams::Stream::from_string($content).sed_lines($start, $end).to_string()
+    };
+}
+
+#[macro_export]
+macro_rules! sed_around {
+    ($content:expr, $pattern:expr, $context:expr) => {
+        $crate::streams::Stream::from_string($content).sed_around($pattern, $context).to_string()
+    };
+}
+
+#[macro_export]
+macro_rules! sed_insert {
+    ($content:expr, $sentinel:expr, $source:expr) => {{
+        match $crate::streams::Stream::from_string($source).sed_insert($content, $sentinel) {
+            Ok(stream) => stream.to_string(),
+            Err(e) => {
+                $crate::error!("sed_insert failed: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! sed_template {
+    ($content:expr, $sentinel:expr, $source:expr) => {
+        $crate::streams::Stream::from_string($source).sed_template($content, $sentinel).to_string()
+    };
+}
+
+#[macro_export]
+macro_rules! sed_replace {
+    ($source:expr, $from:expr, $to:expr) => {
+        $source.replace($from, $to)
+    };
+    ($source:expr, $from:expr, $to:expr, all) => {
+        $source.replace($from, $to)  // replace() already replaces all occurrences
+    };
+}
+
+// --- File-based Sed Macros ---
+#[macro_export]
+macro_rules! sed_lines_file {
+    ($path:expr, $start:expr, $end:expr) => {
+        $crate::fs::sed_lines_file($path, $start, $end)
+    };
+}
+
+#[macro_export]
+macro_rules! sed_around_file {
+    ($path:expr, $pattern:expr, $context:expr) => {
+        $crate::fs::sed_around_file($path, $pattern, $context)
+    };
+}
+
+#[macro_export]
+macro_rules! sed_insert_file {
+    ($path:expr, $content:expr, $sentinel:expr) => {{
+        match $crate::fs::sed_insert_file($path, $content, $sentinel) {
+            Ok(_) => {},
+            Err(e) => {
+                $crate::error!("sed_insert_file failed: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! sed_template_file {
+    ($path:expr, $content:expr, $sentinel:expr) => {
+        $crate::fs::sed_template_file($path, $content, $sentinel)
+    };
+}
+
+// --- Archive Macros ---
+#[macro_export]
+macro_rules! tar {
+    (create: $archive:expr, $($path:expr),+) => {{
+        let paths = vec![$($path),+];
+        match $crate::os::create_tar($archive, &paths) {
+            result if result.status == 0 => {
+                $crate::okay!("Created tar archive: {}", $archive);
+            },
+            result => {
+                $crate::error!("Failed to create tar: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    (extract: $archive:expr) => {{
+        match $crate::os::extract_tar($archive, None) {
+            result if result.status == 0 => {
+                $crate::okay!("Extracted tar archive: {}", $archive);
+            },
+            result => {
+                $crate::error!("Failed to extract tar: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    (extract: $archive:expr, to: $dest:expr) => {{
+        match $crate::os::extract_tar($archive, Some($dest)) {
+            result if result.status == 0 => {
+                $crate::okay!("Extracted tar archive to: {}", $dest);
+            },
+            result => {
+                $crate::error!("Failed to extract tar: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    (list: $archive:expr) => {{
+        match $crate::os::list_tar($archive) {
+            result if result.status == 0 => result.output,
+            result => {
+                $crate::error!("Failed to list tar: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! tar_gz {
+    (create: $archive:expr, $($path:expr),+) => {{
+        let paths = vec![$($path),+];
+        match $crate::os::create_tar_gz($archive, &paths) {
+            result if result.status == 0 => {
+                $crate::okay!("Created tar.gz archive: {}", $archive);
+            },
+            result => {
+                $crate::error!("Failed to create tar.gz: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! zip {
+    (create: $archive:expr, $($path:expr),+) => {{
+        let paths = vec![$($path),+];
+        match $crate::os::create_zip($archive, &paths) {
+            result if result.status == 0 => {
+                $crate::okay!("Created zip archive: {}", $archive);
+            },
+            result => {
+                $crate::error!("Failed to create zip: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    (extract: $archive:expr) => {{
+        match $crate::os::extract_zip($archive, None) {
+            result if result.status == 0 => {
+                $crate::okay!("Extracted zip archive: {}", $archive);
+            },
+            result => {
+                $crate::error!("Failed to extract zip: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    (extract: $archive:expr, to: $dest:expr) => {{
+        match $crate::os::extract_zip($archive, Some($dest)) {
+            result if result.status == 0 => {
+                $crate::okay!("Extracted zip archive to: {}", $dest);
+            },
+            result => {
+                $crate::error!("Failed to extract zip: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    (list: $archive:expr) => {{
+        match $crate::os::list_zip($archive) {
+            result if result.status == 0 => result.output,
+            result => {
+                $crate::error!("Failed to list zip: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+}
+
+// Simple pack macro that auto-detects format from extension
+#[macro_export]
+macro_rules! pack {
+    ($archive:expr, $($path:expr),+) => {{
+        let archive_path = $archive;
+        if archive_path.ends_with(".tar.gz") || archive_path.ends_with(".tgz") {
+            $crate::tar_gz!(create: archive_path, $($path),+);
+        } else if archive_path.ends_with(".tar") {
+            $crate::tar!(create: archive_path, $($path),+);
+        } else if archive_path.ends_with(".zip") {
+            $crate::zip!(create: archive_path, $($path),+);
+        } else {
+            $crate::error!("Unsupported archive format: {}", archive_path);
+            std::process::exit(1);
+        }
+    }};
+}
+
+// Simple unpack macro that auto-detects format from extension
+#[macro_export]
+macro_rules! unpack {
+    ($archive:expr) => {{
+        let archive_path = $archive;
+        if archive_path.ends_with(".tar.gz") || archive_path.ends_with(".tgz") || archive_path.ends_with(".tar") {
+            $crate::tar!(extract: archive_path);
+        } else if archive_path.ends_with(".zip") {
+            $crate::zip!(extract: archive_path);
+        } else {
+            $crate::error!("Unsupported archive format: {}", archive_path);
+            std::process::exit(1);
+        }
+    }};
+    ($archive:expr, to: $dest:expr) => {{
+        let archive_path = $archive;
+        if archive_path.ends_with(".tar.gz") || archive_path.ends_with(".tgz") || archive_path.ends_with(".tar") {
+            $crate::tar!(extract: archive_path, to: $dest);
+        } else if archive_path.ends_with(".zip") {
+            $crate::zip!(extract: archive_path, to: $dest);
+        } else {
+            $crate::error!("Unsupported archive format: {}", archive_path);
+            std::process::exit(1);
+        }
+    }};
+}
+
+// --- System Information Macros ---
+#[macro_export]
+macro_rules! hostname {
+    () => {
+        $crate::os::get_hostname()
+    };
+}
+
+#[macro_export]
+macro_rules! user {
+    () => {
+        $crate::os::get_username()
+    };
+}
+
+#[macro_export]
+macro_rules! home_dir {
+    () => {
+        $crate::os::get_home_dir()
+    };
+}
+
+#[macro_export]
+macro_rules! current_dir {
+    () => {
+        $crate::os::get_current_dir()
+    };
+}
+
+// --- Network Macros ---
+#[macro_export]
+macro_rules! curl {
+    ($url:expr) => {{
+        match $crate::os::http_get($url) {
+            result if result.status == 0 => result.output,
+            result => {
+                $crate::error!("curl failed: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    ($url:expr, options: $opts:expr) => {{
+        match $crate::os::http_get_with_options($url, $opts) {
+            result if result.status == 0 => result.output,
+            result => {
+                $crate::error!("curl failed: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    (post: $url:expr, data: $data:expr) => {{
+        match $crate::os::http_post($url, $data) {
+            result if result.status == 0 => result.output,
+            result => {
+                $crate::error!("curl POST failed: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! get {
+    ($url:expr) => {
+        $crate::curl!($url)
+    };
+    ($url:expr, options: $opts:expr) => {
+        $crate::curl!($url, options: $opts)
+    };
+}
+
+// --- Process Management Macros ---
+#[macro_export]
+macro_rules! pid_of {
+    ($process:expr) => {
+        $crate::os::pid_of($process)
+    };
+}
+
+#[macro_export]
+macro_rules! process_exists {
+    ($process:expr) => {
+        $crate::os::process_exists($process)
+    };
+}
+
+#[macro_export]
+macro_rules! kill_pid {
+    ($pid:expr) => {{
+        match $crate::os::kill_pid($pid, None) {
+            result if result.status == 0 => {
+                $crate::okay!("Process {} terminated", $pid);
+            },
+            result => {
+                $crate::error!("Failed to kill process {}: {}", $pid, result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    ($pid:expr, signal: $sig:expr) => {{
+        match $crate::os::kill_pid($pid, Some($sig)) {
+            result if result.status == 0 => {
+                $crate::okay!("Process {} terminated with {}", $pid, $sig);
+            },
+            result => {
+                $crate::error!("Failed to kill process {}: {}", $pid, result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! kill_process {
+    ($process:expr) => {{
+        match $crate::os::kill_process($process, None) {
+            result if result.status == 0 => {
+                $crate::okay!("Killed all {} processes", $process);
+            },
+            result => {
+                $crate::error!("Failed to kill {}: {}", $process, result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    ($process:expr, signal: $sig:expr) => {{
+        match $crate::os::kill_process($process, Some($sig)) {
+            result if result.status == 0 => {
+                $crate::okay!("Killed all {} processes with {}", $process, $sig);
+            },
+            result => {
+                $crate::error!("Failed to kill {}: {}", $process, result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+}
+
+// --- Locking Macros ---
+#[macro_export]
+macro_rules! with_lock {
+    ($lock_path:expr => $body:block) => {{
+        match $crate::os::create_lock($lock_path) {
+            Ok(_) => {
+                let result = $body;
+                $crate::os::remove_lock($lock_path);
+                result
+            },
+            Err(e) => {
+                $crate::error!("Failed to acquire lock: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! lock {
+    ($lock_path:expr) => {{
+        match $crate::os::create_lock($lock_path) {
+            Ok(_) => {
+                $crate::okay!("Lock acquired: {}", $lock_path);
+            },
+            Err(e) => {
+                $crate::error!("Failed to acquire lock: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! unlock {
+    ($lock_path:expr) => {
+        $crate::os::remove_lock($lock_path);
+        $crate::okay!("Lock released: {}", $lock_path);
+    };
+}
+
+// --- JSON Macros (requires jq) ---
+#[macro_export]
+macro_rules! json_get {
+    ($json:expr, $path:expr) => {
+        $crate::os::json_get($json, $path)
+    };
+}
+
+#[macro_export]
+macro_rules! json_get_file {
+    ($file:expr, $path:expr) => {
+        $crate::os::json_get_file($file, $path)
     };
 }
 

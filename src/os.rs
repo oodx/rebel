@@ -231,3 +231,197 @@ pub fn is_command(cmd: &str) -> bool {
 
     false
 }
+
+// --- Archive Operations ---
+
+/// Creates a tar archive using system tar command.
+pub fn create_tar(archive_path: &str, source_paths: &[&str]) -> CmdResult {
+    let paths = source_paths.join(" ");
+    let cmd = format!("tar -cf '{}' {}", archive_path, paths);
+    run_cmd_with_status(&cmd)
+}
+
+/// Creates a compressed tar.gz archive using system tar command.
+pub fn create_tar_gz(archive_path: &str, source_paths: &[&str]) -> CmdResult {
+    let paths = source_paths.join(" ");
+    let cmd = format!("tar -czf '{}' {}", archive_path, paths);
+    run_cmd_with_status(&cmd)
+}
+
+/// Extracts a tar archive using system tar command.
+pub fn extract_tar(archive_path: &str, dest_dir: Option<&str>) -> CmdResult {
+    let cmd = if let Some(dir) = dest_dir {
+        format!("tar -xf '{}' -C '{}'", archive_path, dir)
+    } else {
+        format!("tar -xf '{}'", archive_path)
+    };
+    run_cmd_with_status(&cmd)
+}
+
+/// Lists contents of a tar archive using system tar command.
+pub fn list_tar(archive_path: &str) -> CmdResult {
+    let cmd = format!("tar -tf '{}'", archive_path);
+    run_cmd_with_status(&cmd)
+}
+
+/// Creates a zip archive using system zip command.
+pub fn create_zip(archive_path: &str, source_paths: &[&str]) -> CmdResult {
+    let paths = source_paths.join(" ");
+    let cmd = format!("zip -r '{}' {}", archive_path, paths);
+    run_cmd_with_status(&cmd)
+}
+
+/// Extracts a zip archive using system unzip command.
+pub fn extract_zip(archive_path: &str, dest_dir: Option<&str>) -> CmdResult {
+    let cmd = if let Some(dir) = dest_dir {
+        format!("unzip '{}' -d '{}'", archive_path, dir)
+    } else {
+        format!("unzip '{}'", archive_path)
+    };
+    run_cmd_with_status(&cmd)
+}
+
+/// Lists contents of a zip archive using system unzip command.
+pub fn list_zip(archive_path: &str) -> CmdResult {
+    let cmd = format!("unzip -l '{}'", archive_path);
+    run_cmd_with_status(&cmd)
+}
+
+// --- Additional System Information Functions ---
+
+/// Gets the current username.
+pub fn get_username() -> String {
+    if let Ok(user) = std::env::var("USER") {
+        user
+    } else if let Ok(user) = std::env::var("USERNAME") { // Windows
+        user
+    } else {
+        run_cmd("whoami").trim().to_string()
+    }
+}
+
+/// Gets the current user's home directory.
+pub fn get_home_dir() -> String {
+    std::env::var("HOME").unwrap_or_else(|_| "/".to_string())
+}
+
+/// Gets the current working directory.
+pub fn get_current_dir() -> String {
+    std::env::current_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| ".".to_string())
+}
+
+// --- Network Functions ---
+
+/// Simple HTTP GET using curl.
+pub fn http_get(url: &str) -> CmdResult {
+    let cmd = format!("curl -s '{}'", url);
+    run_cmd_with_status(&cmd)
+}
+
+/// HTTP GET with custom options.
+pub fn http_get_with_options(url: &str, options: &str) -> CmdResult {
+    let cmd = format!("curl {} '{}'", options, url);
+    run_cmd_with_status(&cmd)
+}
+
+/// Simple HTTP POST using curl.
+pub fn http_post(url: &str, data: &str) -> CmdResult {
+    let cmd = format!("curl -s -X POST -d '{}' '{}'", data, url);
+    run_cmd_with_status(&cmd)
+}
+
+// --- Process Management Functions ---
+
+/// Get process ID of a named process.
+pub fn pid_of(process_name: &str) -> String {
+    let result = run_cmd(&format!("pgrep '{}'", process_name));
+    result.lines().next().unwrap_or("").trim().to_string()
+}
+
+/// Check if a process exists by name.
+pub fn process_exists(process_name: &str) -> bool {
+    !pid_of(process_name).is_empty()
+}
+
+/// Kill a process by PID.
+pub fn kill_pid(pid: &str, signal: Option<&str>) -> CmdResult {
+    let sig = signal.unwrap_or("TERM");
+    let cmd = format!("kill -{} {}", sig, pid);
+    run_cmd_with_status(&cmd)
+}
+
+/// Kill all processes by name.
+pub fn kill_process(process_name: &str, signal: Option<&str>) -> CmdResult {
+    let sig = signal.unwrap_or("TERM");
+    let cmd = format!("pkill -{} '{}'", sig, process_name);
+    run_cmd_with_status(&cmd)
+}
+
+// --- Locking Functions ---
+
+use std::io::Write;
+
+/// Create a lock file with PID.
+pub fn create_lock(lock_path: &str) -> Result<(), String> {
+    use std::fs::File;
+    
+    if std::path::Path::new(lock_path).exists() {
+        // Check if the PID in the lock file is still running
+        if let Ok(contents) = std::fs::read_to_string(lock_path) {
+            let old_pid = contents.trim();
+            if process_exists_by_pid(old_pid) {
+                return Err(format!("Lock file exists and process {} is running", old_pid));
+            }
+            // Stale lock file, remove it
+            let _ = std::fs::remove_file(lock_path);
+        }
+    }
+    
+    let mut file = File::create(lock_path)
+        .map_err(|e| format!("Failed to create lock file: {}", e))?;
+    
+    let pid = std::process::id();
+    write!(file, "{}", pid)
+        .map_err(|e| format!("Failed to write PID to lock file: {}", e))?;
+    
+    Ok(())
+}
+
+/// Remove a lock file.
+pub fn remove_lock(lock_path: &str) {
+    let _ = std::fs::remove_file(lock_path);
+}
+
+/// Check if a process exists by PID.
+pub fn process_exists_by_pid(pid: &str) -> bool {
+    if pid.is_empty() {
+        return false;
+    }
+    
+    let result = run_cmd(&format!("ps -p {} -o pid=", pid));
+    !result.trim().is_empty()
+}
+
+// --- Basic JSON Functions (shell-based) ---
+
+/// Extract a value from JSON using jq (if available).
+pub fn json_get(json_str: &str, path: &str) -> String {
+    if !is_command("jq") {
+        return String::new();
+    }
+    
+    let cmd = format!("echo '{}' | jq -r '{}'", json_str.replace("'", "'\"'\"'"), path);
+    run_cmd(&cmd).trim().to_string()
+}
+
+/// Extract a value from JSON file using jq (if available).
+pub fn json_get_file(json_file: &str, path: &str) -> String {
+    if !is_command("jq") {
+        return String::new();
+    }
+    
+    let cmd = format!("jq -r '{}' '{}'", path, json_file);
+    run_cmd(&cmd).trim().to_string()
+}

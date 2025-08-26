@@ -81,7 +81,7 @@ fn test_trap_on_err() {
     cmd.arg("trap-test");
     cmd.assert()
         .success()
-        .stderr(predicate::str::contains("ERROR TRAP: Command 'shell!' failed with status"))
+        .stderr(predicate::str::contains("ERROR TRAP: Command 'run!' failed with status"))
         .stdout(predicate::str::contains("Final error count: 1"));
 }
 

@@ -16,3 +16,7 @@ uuid = { version = "1.17.0", features = ["v4"] }
 assert_cmd = "2.0"
 predicates = "3.0"
 assert_fs = "1.0"
+
+[[bin]]
+name = "func"
+path = "port/func.rs"

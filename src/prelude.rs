@@ -21,11 +21,15 @@ pub use crate::math::*;
 
 // Re-export all macros.
 pub use crate::{
-    args, backup, benchmark, bootstrap, case, cap_stream, cat, chmod, clear, cmd, confirm, date,
-    debug, dict, dispatch, echo, error, event, export, fatal, file_in, for_in, get_env, gen_dict,
-    info, job, load_config, math, meta_key, meta_keys, okay, param, path_canon, path_split, pipe,
-    pre_dispatch, printf, prompt, rand_alnum, rand_alpha, rand_dict, rand_hex, rand_range,
-    rand_string, rand_uuid, require_command, require_dir, require_file, require_var, shell, sleep,
-    src, stream, str_explode, str_in, str_len, str_line, str_trim, subst, test, trace, trap,
-    validate, warn,
+    args, backup, benchmark, bootstrap, case, cap_stream, cat, chmod, clear, cmd, confirm, 
+    current_dir, curl, date, debug, dict, dispatch, echo, error, event, export, fatal, file_in, 
+    for_in, get, get_env, gen_dict, home_dir, hostname, info, job, json_get, json_get_file, 
+    kill_pid, kill_process, load_config, lock, math, meta_key, meta_keys, okay, pack, param, 
+    path_canon, path_split, pid_of, pipe, pre_dispatch, printf, process_exists, prompt, 
+    rand_alnum, rand_alpha, rand_dict, rand_hex, rand_range, rand_string, rand_uuid, 
+    readline, require_command, require_dir, require_file, require_var, sed_around, sed_around_file, 
+    sed_insert, sed_insert_file, sed_lines, sed_lines_file, sed_replace, sed_template, 
+    sed_template_file, run, shell, sleep, src, stderr, stream, str_explode, str_in, str_len, str_line, 
+    str_trim, subst, tar, tar_gz, test, to_number, trace, trap, unpack, unlock, user, validate, warn, 
+    with_lock, zip,
 };

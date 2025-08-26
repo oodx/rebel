@@ -367,3 +367,34 @@ pub fn cleanup_temp_files() {
         }
     }
 }
+
+/// Applies sed_lines operation directly to a file, returns the result as a string.
+pub fn sed_lines_file(path: &str, start_line: usize, end_line: usize) -> String {
+    use crate::streams::Stream;
+    let content = read_file(path);
+    Stream::from_string(&content).sed_lines(start_line, end_line).to_string()
+}
+
+/// Applies sed_around operation directly to a file, returns the result as a string.
+pub fn sed_around_file(path: &str, pattern: &str, context_lines: usize) -> String {
+    use crate::streams::Stream;
+    let content = read_file(path);
+    Stream::from_string(&content).sed_around(pattern, context_lines).to_string()
+}
+
+/// Applies sed_insert operation directly to a file, modifying the file in place.
+pub fn sed_insert_file(path: &str, content: &str, sentinel: &str) -> Result<(), String> {
+    use crate::streams::Stream;
+    let file_content = read_file(path);
+    let result_stream = Stream::from_string(&file_content).sed_insert(content, sentinel)?;
+    write_file(path, &result_stream.to_string());
+    Ok(())
+}
+
+/// Applies sed_template operation directly to a file, modifying the file in place.
+pub fn sed_template_file(path: &str, content: &str, sentinel: &str) {
+    use crate::streams::Stream;
+    let file_content = read_file(path);
+    let result = Stream::from_string(&file_content).sed_template(content, sentinel).to_string();
+    write_file(path, &result);
+}

@@ -40,7 +40,10 @@ fn main() {
         "cap-stream-test" => cap_stream_test,
         "trap-test" => trap_test,
         "random-test" => random_test,
-        "dict-test" => dict_test
+        "dict-test" => dict_test,
+        "sed-test" => sed_test,
+        "archive-test" => archive_test,
+        "utils-test" => utils_test
     });
 }
 
@@ -335,7 +338,7 @@ fn trap_test(_args: Args) -> i32 {
     }, on: "COMMAND_ERROR");
 
     // This command will fail and trigger the trap
-    shell!("ls /nonexistent-directory");
+    run!("ls /nonexistent-directory");
 
     echo!("Final error count: $ERROR_COUNT");
     0
@@ -358,5 +361,142 @@ fn dict_test(_args: Args) -> i32 {
 
     gen_dict!(alnum, 5, into: "RANDOM_WORDS");
     echo!("Generated words: $RANDOM_WORDS");
+    0
+}
+
+fn sed_test(_args: Args) -> i32 {
+    // Test data
+    let sample_text = "Line 1\nLine 2\nIMPORTANT: Main content\nLine 4\nLine 5\nLine 6\n{{PLACEHOLDER}}\nLine 8\nLine 9\nLine 10";
+    
+    info!("Testing sed_lines (lines 2-4):");
+    let lines_result = sed_lines!(sample_text, 2, 4);
+    echo!("{}", lines_result);
+    
+    info!("Testing sed_around (2 lines around 'IMPORTANT'):");
+    let around_result = sed_around!(sample_text, "IMPORTANT", 2);
+    echo!("{}", around_result);
+    
+    info!("Testing sed_insert (replace {{PLACEHOLDER}}):");
+    let insert_content = "INSERTED LINE 1\nINSERTED LINE 2\nINSERTED LINE 3";
+    let insert_result = sed_insert!(insert_content, "{{PLACEHOLDER}}", sample_text);
+    echo!("{}", insert_result);
+    
+    info!("Testing sed_template (replace all instances):");
+    let template_text = "Hello {{NAME}}, welcome to {{PLACE}}! {{NAME}}, enjoy your stay at {{PLACE}}.";
+    let template_result1 = sed_template!("Alice", "{{NAME}}", &template_text);
+    let template_result2 = sed_template!("Wonderland", "{{PLACE}}", &template_result1);
+    echo!("{}", template_result2);
+    
+    info!("Testing sed_replace (simple replacement):");
+    let replace_result = sed_replace!("Hello world, world!", "world", "RSB");
+    echo!("{}", replace_result);
+    
+    0
+}
+
+fn archive_test(_args: Args) -> i32 {
+    info!("Testing archive operations...");
+    
+    // Create test files
+    write_file("test1.txt", "Hello from file 1");
+    write_file("test2.txt", "Hello from file 2");
+    mkdir_p("testdir");
+    write_file("testdir/test3.txt", "Hello from file 3");
+    
+    info!("Testing pack! macro (auto-detect format):");
+    pack!("test.tar.gz", "test1.txt", "test2.txt", "testdir");
+    
+    info!("Testing tar! macro operations:");
+    tar!(create: "test.tar", "test1.txt", "test2.txt");
+    
+    info!("Listing tar contents:");
+    let tar_contents = tar!(list: "test.tar");
+    echo!("{}", tar_contents);
+    
+    if is_command("zip") {
+        info!("Testing zip! macro operations:");
+        zip!(create: "test.zip", "test1.txt", "test2.txt");
+        
+        info!("Listing zip contents:");
+        let zip_contents = zip!(list: "test.zip");
+        echo!("{}", zip_contents);
+    } else {
+        warn!("zip command not available, skipping zip tests");
+    }
+    
+    info!("Testing unpack! macro:");
+    mkdir_p("extract_test");
+    unpack!("test.tar", to: "extract_test");
+    
+    info!("Files extracted to extract_test:");
+    file_in!(file in "extract_test" => {
+        echo!("Found: $file");
+    });
+    
+    // Cleanup
+    rm_rf("test1.txt");
+    rm_rf("test2.txt");
+    rm_rf("testdir");
+    rm_rf("test.tar");
+    rm_rf("test.tar.gz");
+    rm_rf("test.zip");
+    rm_rf("extract_test");
+    
+    0
+}
+
+fn utils_test(_args: Args) -> i32 {
+    info!("Testing system utilities...");
+    
+    // System information
+    echo!("Hostname: {}", hostname!());
+    echo!("User: {}", user!());
+    echo!("Home: {}", home_dir!());
+    echo!("Current dir: {}", current_dir!());
+    
+    // Process management (demo only, using sleep)
+    info!("Testing process management...");
+    let job_id = job!(background: "sleep 1");
+    echo!("Started sleep job: {}", job_id);
+    
+    let sleep_pid = pid_of!("sleep");
+    if !sleep_pid.is_empty() {
+        echo!("Found sleep process with PID: {}", sleep_pid);
+        echo!("Process exists: {}", process_exists!("sleep"));
+    }
+    
+    job!(wait: job_id);
+    
+    // Locking demonstration
+    info!("Testing locking mechanism...");
+    with_lock!("/tmp/rsb-test.lock" => {
+        echo!("Inside locked section!");
+        sleep!(ms: 100);
+    });
+    
+    // Network (if curl is available)
+    if is_command("curl") {
+        info!("Testing HTTP utilities...");
+        // Test with a simple HTTP request (httpbin echo)
+        let response = get!("https://httpbin.org/get?test=rsb", options: "-s --connect-timeout 5");
+        if !response.is_empty() {
+            echo!("HTTP GET response received ({} bytes)", response.len());
+            
+            // JSON parsing if jq is available
+            if is_command("jq") {
+                let test_param = json_get!(&response, ".args.test");
+                if !test_param.is_empty() {
+                    echo!("Parsed JSON field 'args.test': {}", test_param);
+                }
+            } else {
+                warn!("jq not available, skipping JSON parsing test");
+            }
+        } else {
+            warn!("HTTP request failed or returned empty response");
+        }
+    } else {
+        warn!("curl not available, skipping HTTP tests");
+    }
+    
     0
 }
