@@ -30,6 +30,6 @@ pub use crate::{
     readline, require_command, require_dir, require_file, require_var, sed_around, sed_around_file, 
     sed_insert, sed_insert_file, sed_lines, sed_lines_file, sed_replace, sed_template, 
     sed_template_file, run, shell, sleep, src, stderr, stream, str_explode, str_in, str_len, str_line, 
-    str_trim, subst, tar, tar_gz, test, to_number, trace, trap, unpack, unlock, user, validate, warn, 
+    str_trim, subst, tar, tar_gz, test, tmp, to_number, trace, trap, unpack, unlock, user, validate, warn, 
     with_lock, zip,
 };

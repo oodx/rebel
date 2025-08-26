@@ -1,7 +1,7 @@
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use std::process::Command;
-use assert_fs::fixture::{PathChild, FileWriteStr};
+use rsb::prelude::*;
 
 /// Builds the example binary and returns a Command prepared to run it.
 fn get_example_cmd() -> Command {
@@ -25,7 +25,9 @@ fn get_example_cmd() -> Command {
 #[test]
 fn test_date_and_benchmark_macros() {
     let mut cmd = get_example_cmd();
-    cmd.env("DEBUG", "1").arg("date-test");
+    cmd.env("DEBUG", "1")
+       .env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .arg("date-test");
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("Epoch:"))
@@ -34,12 +36,18 @@ fn test_date_and_benchmark_macros() {
 
 #[test]
 fn test_file_in_macro() {
-    let temp_dir = assert_fs::TempDir::new().unwrap();
-    temp_dir.child("file1.txt").write_str("content1").unwrap();
-    temp_dir.child("file2.txt").write_str("content2").unwrap();
+    // Create a temporary directory for testing
+    let temp_dir = std::env::temp_dir().join(format!("rsb_file_in_test_{}", std::process::id()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    
+    // Create test files using standard rust filesystem functions
+    std::fs::write(temp_dir.join("file1.txt"), "content1").unwrap();
+    std::fs::write(temp_dir.join("file2.txt"), "content2").unwrap();
 
     let mut cmd = get_example_cmd();
-    cmd.arg("file-in-test").arg(temp_dir.path());
+    cmd.env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .arg("file-in-test")
+       .arg(&temp_dir);
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("file1.txt"))
@@ -49,7 +57,9 @@ fn test_file_in_macro() {
 #[test]
 fn test_path_split_macro() {
     let mut cmd = get_example_cmd();
-    cmd.arg("path-test").arg("/tmp/some/file.txt");
+    cmd.env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .arg("path-test")
+       .arg("/tmp/some/file.txt");
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("Parent: /tmp/some"))
@@ -59,7 +69,8 @@ fn test_path_split_macro() {
 #[test]
 fn test_math_macro() {
     let mut cmd = get_example_cmd();
-    cmd.arg("math-test");
+    cmd.env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .arg("math-test");
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("C = 26.25"))
@@ -69,7 +80,8 @@ fn test_math_macro() {
 #[test]
 fn test_cap_stream_macro() {
     let mut cmd = get_example_cmd();
-    cmd.arg("cap-stream-test");
+    cmd.env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .arg("cap-stream-test");
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("Temp file exists."));
@@ -78,7 +90,9 @@ fn test_cap_stream_macro() {
 #[test]
 fn test_trap_on_err() {
     let mut cmd = get_example_cmd();
-    cmd.arg("trap-test");
+    cmd.env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .env("DEBUG_MODE", "1") // Enable info! messages
+       .arg("trap-test");
     cmd.assert()
         .success()
         .stderr(predicate::str::contains("ERROR TRAP: Command 'run!' failed with status"))
@@ -88,7 +102,8 @@ fn test_trap_on_err() {
 #[test]
 fn test_random_macros() {
     let mut cmd = get_example_cmd();
-    cmd.arg("random-test");
+    cmd.env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .arg("random-test");
     cmd.assert()
         .success()
         .stdout(predicate::str::is_match(r"^rand_alnum: .{10}\n").unwrap())
@@ -98,7 +113,8 @@ fn test_random_macros() {
 #[test]
 fn test_dict_macros() {
     let mut cmd = get_example_cmd();
-    cmd.arg("dict-test");
+    cmd.env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .arg("dict-test");
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("Random word:"))

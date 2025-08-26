@@ -23,11 +23,12 @@ fn main() {
     set_var("opt_bash", "0");
     
     // Pre-dispatch for independent commands
-    if pre_dispatch!(&args, {
+    let handled = pre_dispatch!(&args, {
         "help" => do_usage,
         "version" => do_version,
         "" => do_usage_exit
-    }) {
+    });
+    if handled {
         return;
     }
     

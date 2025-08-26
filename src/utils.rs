@@ -41,27 +41,30 @@ pub fn expand_colors(text: &str) -> String {
 
 pub fn glyph_stderr(level: &str, message: &str) {
     if !should_print_level(level) { return; }
-    let glyphs = GLYPHS.lock().unwrap();
-    let colors = COLORS.lock().unwrap();
-
-    let glyph = glyphs.get(level).cloned().unwrap_or_else(|| "•".to_string());
+    let glyph = {
+        let glyphs = GLYPHS.lock().unwrap();
+        glyphs.get(level).cloned().unwrap_or_else(|| "•".to_string())
+    };
 
     // Check if a specific color is defined for this level.
-    let color_name = if colors.contains_key(level) {
-        level
-    } else {
-        // Fallback to default color mapping.
-        match level {
-            "info" => "cyan", "okay" => "green", "warn" => "yellow",
-            "error" | "fatal" => "red", "debug" => "grey", "trace" => "magenta",
-            _ => "reset",
+    let color_name = {
+        let colors = COLORS.lock().unwrap();
+        if colors.contains_key(level) {
+            level
+        } else {
+            // Fallback to default color mapping.
+            match level {
+                "info" => "cyan", "okay" => "green", "warn" => "yellow",
+                "error" | "fatal" => "red", "debug" => "grey", "trace" => "magenta",
+                _ => "reset",
+            }
         }
     };
 
     // Construct a format string with placeholders
     let format_string = format!("{{{}}}{} {}", color_name, glyph, message);
 
-    // Expand variables and then colors
+    // Expand variables and then colors (mutexes are now released)
     let expanded_vars = expand_vars(&format_string);
     eprintln!("{}", expand_colors(&expanded_vars));
 }

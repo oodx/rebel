@@ -1,7 +1,7 @@
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use std::process::Command;
-use assert_fs::fixture::{PathChild, FileWriteStr};
+use rsb::prelude::*;
 
 /// Builds the example binary and returns a Command prepared to run it.
 fn get_example_cmd() -> Command {
@@ -28,7 +28,8 @@ fn get_example_cmd() -> Command {
 #[test]
 fn test_help_command() {
     let mut cmd = get_example_cmd();
-    cmd.arg("--help");
+    cmd.env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .arg("--help");
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("USAGE:"))
@@ -38,7 +39,8 @@ fn test_help_command() {
 #[test]
 fn test_unknown_command() {
     let mut cmd = get_example_cmd();
-    cmd.arg("nonexistentcommand");
+    cmd.env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .arg("nonexistentcommand");
     cmd.assert()
         .failure()
         .stderr(predicate::str::contains("Unknown command"));
@@ -46,14 +48,19 @@ fn test_unknown_command() {
 
 #[test]
 fn test_init_command() {
-    let temp_dir = assert_fs::TempDir::new().unwrap();
+    // Create a temporary directory for testing
+    let temp_dir = std::env::temp_dir().join(format!("rsb_test_{}", std::process::id()));
     let project_name = "test-project";
-    let project_path = temp_dir.path().join(project_name);
+    let project_path = temp_dir.join(project_name);
 
     let mut cmd = get_example_cmd();
+    // Ensure temp directory exists
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    
     // Run the init command from within the temp directory
-    cmd.current_dir(temp_dir.path())
+    cmd.current_dir(&temp_dir)
        .env("DEBUG", "1") // Enable info/okay messages
+       .env("CARGO_TEST", "1") // Explicitly mark as test environment
        .arg("init")
        .arg(project_name);
 
@@ -67,11 +74,14 @@ fn test_init_command() {
 
 #[test]
 fn test_config_set_get() {
-    let temp_dir = assert_fs::TempDir::new().unwrap();
+    // Create a temporary directory for testing
+    let temp_dir = std::env::temp_dir().join(format!("rsb_config_test_{}", std::process::id()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
 
     let mut cmd_set = get_example_cmd();
-    cmd_set.current_dir(temp_dir.path())
+    cmd_set.current_dir(&temp_dir)
         .env("DEBUG", "1") // Enable info/okay messages
+        .env("CARGO_TEST", "1") // Explicitly mark as test environment
         .arg("config")
         .arg("set")
         .arg("TEST_KEY_PERSIST")
@@ -79,7 +89,8 @@ fn test_config_set_get() {
     cmd_set.assert().success();
 
     let mut cmd_get = get_example_cmd();
-    cmd_get.current_dir(temp_dir.path())
+    cmd_get.current_dir(&temp_dir)
+        .env("CARGO_TEST", "1") // Explicitly mark as test environment
         .arg("config")
         .arg("get")
         .arg("TEST_KEY_PERSIST");
@@ -90,14 +101,19 @@ fn test_config_set_get() {
 
 #[test]
 fn test_meta_parsing() {
-    let temp_dir = assert_fs::TempDir::new().unwrap();
-    let meta_file = temp_dir.child("test.sh");
-    meta_file.write_str("# author : RSB Developer\n# version: 1.0.0\n\necho 'hello'").unwrap();
+    // Create a temporary directory for testing
+    let temp_dir = std::env::temp_dir().join(format!("rsb_meta_test_{}", std::process::id()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let meta_file_path = temp_dir.join("test.sh");
+    
+    // Write the meta file using standard rust filesystem functions
+    std::fs::write(&meta_file_path, "# author : RSB Developer\n# version: 1.0.0\n\necho 'hello'").unwrap();
 
     let mut cmd = get_example_cmd();
-    cmd.current_dir(temp_dir.path())
+    cmd.current_dir(&temp_dir)
+        .env("CARGO_TEST", "1") // Explicitly mark as test environment
         .arg("meta-test")
-        .arg(meta_file.path());
+        .arg(&meta_file_path);
 
     cmd.assert()
         .success()
