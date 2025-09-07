@@ -1,9 +1,9 @@
-// src/prelude.rs
+// src/preamble.rs
 
-//! The RSB prelude.
+//! The RSB preamble.
 //!
 //! This module re-exports all the common traits, functions, and macros
-//! for easy importing into user code via `use rsb::prelude::*;`.
+//! for easy importing into user code via `use rsb::preamble::*;`.
 
 // Re-export all public structs and functions.
 pub use crate::args::Args;
