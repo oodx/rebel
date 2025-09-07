@@ -18,14 +18,14 @@ pub trait StreamApply {
 
 // Implementation for String - enables direct string pipeline usage
 impl StreamApply for String {
-    fn stream_apply<S: Streamable>(self, streamable: S, args: S::Args) -> Self {
+    fn stream_apply<S: Streamable>(self, _streamable: S, args: S::Args) -> Self {
         S::stream_apply(&self, args)
     }
 }
 
 // Implementation for &str convenience
 impl StreamApply for &str {
-    fn stream_apply<S: Streamable>(self, _streamable: S, args: S::Args) -> Self {
+    fn stream_apply<S: Streamable>(self, _streamable: S, _args: S::Args) -> Self {
         // This is a workaround since we can't return a reference to a local String
         // In practice, users should use String::stream_apply for chaining
         self // Just return self for now - not ideal but fixes compile

@@ -3,6 +3,8 @@
 
 pub mod traits;
 pub mod functions;
+pub mod filters;
+pub mod detectors;
 
 // Re-export commonly used items
 pub use traits::{Streamable, StreamApply};
@@ -20,6 +22,18 @@ pub use functions::{
     // Function-style interfaces
     replace_fn, uppercase_fn, lowercase_fn, reverse_fn, trim_fn,
     base64_encode_fn, base64_decode_fn, url_encode_fn, url_decode_fn,
+};
+
+// Re-export filters
+pub use filters::{
+    FilterLines, FilterEmpty, FilterByLength, FilterRegex, FilterNotContains,
+    FilterDuplicates, FilterStartsWith, FilterEndsWith, TakeLines, SkipLines,
+};
+
+// Re-export detectors
+pub use detectors::{
+    DetectEmpty, DetectPattern, DetectBinary, DetectRegex, DetectDuplicates,
+    DetectEncoding, CountPattern, CountLines, CountWords, DetectAllMatch, DetectAnyMatch,
 };
 
 // Re-export the streamable! macro

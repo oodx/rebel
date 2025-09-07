@@ -1,7 +1,7 @@
 use crate::context::{get_var, set_var};
 
 #[derive(Debug, Clone, PartialEq)]
-enum Token {
+enum MathToken {
     Number(f64),
     Variable(String),
     Operator(char),
@@ -9,7 +9,7 @@ enum Token {
     RightParen,
 }
 
-fn tokenize(expr: &str) -> Result<Vec<Token>, String> {
+fn parse_math_tokens(expr: &str) -> Result<Vec<MathToken>, String> {
     let mut tokens = Vec::new();
     let mut chars = expr.chars().peekable();
     while let Some(&c) = chars.peek() {
@@ -24,7 +24,7 @@ fn tokenize(expr: &str) -> Result<Vec<Token>, String> {
                         break;
                     }
                 }
-                tokens.push(Token::Number(num_str.parse::<f64>().map_err(|_| format!("Invalid number: {}", num_str))?));
+                tokens.push(MathToken::Number(num_str.parse::<f64>().map_err(|_| format!("Invalid number: {}", num_str))?));
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let mut var_str = String::new();
@@ -36,27 +36,27 @@ fn tokenize(expr: &str) -> Result<Vec<Token>, String> {
                         break;
                     }
                 }
-                tokens.push(Token::Variable(var_str));
+                tokens.push(MathToken::Variable(var_str));
             }
             '+' | '-' | '/' | '%' => {
-                tokens.push(Token::Operator(c));
+                tokens.push(MathToken::Operator(c));
                 chars.next();
             }
             '*' => {
                 chars.next();
                 if chars.peek() == Some(&'*') {
                     chars.next();
-                    tokens.push(Token::Operator('^')); // Use ^ internally for power
+                    tokens.push(MathToken::Operator('^')); // Use ^ internally for power
                 } else {
-                    tokens.push(Token::Operator('*'));
+                    tokens.push(MathToken::Operator('*'));
                 }
             }
             '(' => {
-                tokens.push(Token::LeftParen);
+                tokens.push(MathToken::LeftParen);
                 chars.next();
             }
             ')' => {
-                tokens.push(Token::RightParen);
+                tokens.push(MathToken::RightParen);
                 chars.next();
             }
             ' ' => {
@@ -77,32 +77,32 @@ fn get_precedence(op: char) -> i32 {
     }
 }
 
-fn shunting_yard(tokens: Vec<Token>) -> Result<Vec<Token>, String> {
-    let mut output_queue: Vec<Token> = Vec::new();
-    let mut operator_stack: Vec<Token> = Vec::new();
+fn shunting_yard(tokens: Vec<MathToken>) -> Result<Vec<MathToken>, String> {
+    let mut output_queue: Vec<MathToken> = Vec::new();
+    let mut operator_stack: Vec<MathToken> = Vec::new();
 
     for token in tokens {
         match token {
-            Token::Number(_) | Token::Variable(_) => output_queue.push(token),
-            Token::Operator(op1) => {
-                while let Some(Token::Operator(op2)) = operator_stack.last() {
+            MathToken::Number(_) | MathToken::Variable(_) => output_queue.push(token),
+            MathToken::Operator(op1) => {
+                while let Some(MathToken::Operator(op2)) = operator_stack.last() {
                     if get_precedence(op1) <= get_precedence(*op2) {
                         output_queue.push(operator_stack.pop().unwrap());
                     } else {
                         break;
                     }
                 }
-                operator_stack.push(Token::Operator(op1));
+                operator_stack.push(MathToken::Operator(op1));
             }
-            Token::LeftParen => operator_stack.push(Token::LeftParen),
-            Token::RightParen => {
+            MathToken::LeftParen => operator_stack.push(MathToken::LeftParen),
+            MathToken::RightParen => {
                 while let Some(top) = operator_stack.last() {
-                    if *top == Token::LeftParen {
+                    if *top == MathToken::LeftParen {
                         break;
                     }
                     output_queue.push(operator_stack.pop().unwrap());
                 }
-                if operator_stack.pop() != Some(Token::LeftParen) {
+                if operator_stack.pop() != Some(MathToken::LeftParen) {
                     return Err("Mismatched parentheses".to_string());
                 }
             }
@@ -110,7 +110,7 @@ fn shunting_yard(tokens: Vec<Token>) -> Result<Vec<Token>, String> {
     }
 
     while let Some(op) = operator_stack.pop() {
-        if op == Token::LeftParen {
+        if op == MathToken::LeftParen {
             return Err("Mismatched parentheses".to_string());
         }
         output_queue.push(op);
@@ -119,18 +119,18 @@ fn shunting_yard(tokens: Vec<Token>) -> Result<Vec<Token>, String> {
     Ok(output_queue)
 }
 
-fn evaluate_rpn(rpn_queue: Vec<Token>) -> Result<f64, String> {
+fn evaluate_rpn(rpn_queue: Vec<MathToken>) -> Result<f64, String> {
     let mut value_stack: Vec<f64> = Vec::new();
 
     for token in rpn_queue {
         match token {
-            Token::Number(n) => value_stack.push(n),
-            Token::Variable(var_name) => {
+            MathToken::Number(n) => value_stack.push(n),
+            MathToken::Variable(var_name) => {
                 let val_str = get_var(&var_name);
                 let val = val_str.parse::<f64>().map_err(|_| format!("Variable '{}' is not a valid number: {}", var_name, val_str))?;
                 value_stack.push(val);
             }
-            Token::Operator(op) => {
+            MathToken::Operator(op) => {
                 let b = value_stack.pop().ok_or("Invalid expression: missing operand")?;
                 let a = value_stack.pop().ok_or("Invalid expression: missing operand")?;
                 let result = match op {
@@ -179,7 +179,7 @@ pub fn evaluate_expression(full_expr: &str) -> Result<f64, String> {
         ('=', target_var)
     };
 
-    let tokens = tokenize(expr_str)?;
+    let tokens = parse_math_tokens(expr_str)?;
     let rpn = shunting_yard(tokens)?;
     let mut result = evaluate_rpn(rpn)?;
 
