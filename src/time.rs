@@ -61,6 +61,22 @@ pub fn human_date(date_str: &str) -> String {
     }
 }
 
+/// Returns a human-friendly time remaining until the given date.
+/// If the date is in the past, returns "0s".
+pub fn time_until(date_str: &str) -> String {
+    if let Some(target) = parse_date_string(date_str) {
+        let now = Utc::now();
+        if target > now {
+            let duration = target.signed_duration_since(now);
+            format!("in {}", format_duration(duration))
+        } else {
+            "0s".to_string()
+        }
+    } else {
+        "Invalid date format".to_string()
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

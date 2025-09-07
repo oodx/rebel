@@ -9,7 +9,7 @@ This document tracks potential features and improvements for future versions of 
 - **Description:** A full suite of `chrono`-based time and date utilities.
 - **Features:**
   - `time_diff(start, end)`: Calculate the difference between two date/time strings.
-  - `time_until(date)`: Produce a human-readable string like "in 2 hours".
+  - `time_until(date)`: Produce a human-readable string like "in 2 hours". [SELECTED]
   - `human_date(date)`: Format dates nicely (e.g., "3 days ago").
   - `benchmark! { ... }`: A macro to measure the execution time of a block of code.
   - `job!(timeout: 10s, ...)`: Add timeout support to the job control system.
@@ -46,7 +46,7 @@ This document tracks potential features and improvements for future versions of 
 - **Description:** The `param!` macro's prefix/suffix removal (`#`, `##`, `%`, `%%`) currently uses simple string matching. It should support shell-style glob patterns.
 - **Example:** `param!("FILENAME", suffix: "*.log")`
 
-### 8. `colored!` Macro
+### 8. `colored!` Macro [SELECTED]
 - **Description:** A dedicated macro for color/glyph parsing, allowing users to easily format their own strings without necessarily printing to `stderr`.
 - **Example:** `let formatted = colored!("{red}My custom error{reset}");`
 
@@ -67,7 +67,7 @@ This document tracks potential features and improvements for future versions of 
         // ... test logic ...
     });
     ```
-  - **`mock_cmd!` macro**: A way to mock the output of `cmd!` and `shell!` calls to prevent running real, slow, or destructive commands.
+  - **`mock_cmd!` macro**: A way to mock the output of `cmd!` and `shell!` calls to prevent running real, slow, or destructive commands. [SELECTED]
     ```rust
     rsb_test!("test git status" => {
         mock_cmd!({

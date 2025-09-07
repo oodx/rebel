@@ -389,3 +389,20 @@ The RSB framework is designed to be the bridge between the simplicity of shell s
 *   **Fail Fast and Clear:** Use `validate!` and `require_*` macros to handle errors declaratively.
 *   **Isolate Complexity:** Use the **Adapter Pattern** when you need to integrate with non-shell systems.
 
+
+## Dependency Re-exports
+
+To simplify downstream usage, RSB re-exports common third-party crates under `rsb::deps`. This lets consumers avoid duplicating these dependencies in their own `Cargo.toml` and import them from a single namespace.
+
+```rust
+// Access third-party crates via rsb
+use rsb::deps::rand::{Rng, distributions::Alphanumeric};
+use rsb::deps::uuid::Uuid;
+use rsb::deps::lazy_static::lazy_static;
+
+let token: String = rsb::deps::rand::thread_rng()
+    .sample_iter(&Alphanumeric)
+    .take(8)
+    .map(char::from)
+    .collect();
+```

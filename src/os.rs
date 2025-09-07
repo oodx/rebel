@@ -19,6 +19,10 @@ pub struct CmdResult {
 /// Executes a shell command and returns a `CmdResult`.
 pub fn run_cmd_with_status(cmd: &str) -> CmdResult {
     let expanded_cmd = expand_vars(cmd);
+    // Mocked command outputs (primarily for tests)
+    if let Some(mock_out) = MOCK_CMDS.lock().unwrap().get(&expanded_cmd).cloned() {
+        return CmdResult { status: 0, output: mock_out, error: String::new() };
+    }
     let output = Command::new("sh")
         .arg("-c")
         .arg(&expanded_cmd)
@@ -63,6 +67,20 @@ pub fn shell_exec(cmd: &str, silent: bool) -> Result<String, CmdResult> {
     }
 }
 
+/// Set mocked command outputs. Intended for tests.
+pub fn set_mock_cmds(pairs: &[(&str, &str)]) {
+    let mut map = MOCK_CMDS.lock().unwrap();
+    map.clear();
+    for (cmd, out) in pairs {
+        map.insert((*cmd).to_string(), (*out).to_string());
+    }
+}
+
+/// Clear all mocked commands.
+pub fn clear_mock_cmds() {
+    MOCK_CMDS.lock().unwrap().clear();
+}
+
 
 // --- Job Control ---
 
@@ -81,6 +99,7 @@ lazy_static! {
     pub static ref JOBS: Arc<Mutex<HashMap<u32, Arc<Mutex<JobHandle>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
     pub static ref JOB_COUNTER: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+    static ref MOCK_CMDS: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
 /// Waits for a specific job to complete and returns its exit status.

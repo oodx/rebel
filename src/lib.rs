@@ -1,4 +1,4 @@
-pub mod preamble;
+pub mod prelude;
 pub mod args;
 pub mod context;
 pub mod fs;
@@ -9,3 +9,4 @@ pub mod time;
 pub mod utils;
 pub mod random;
 pub mod math;
+pub mod deps;
