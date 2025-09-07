@@ -19,9 +19,11 @@ pub use crate::streamable::{
     Replace, UpperCase, LowerCase, Trim, Reverse,
     Base64Encode, Base64Decode, UrlEncode, UrlDecode,
     Head, Tail, Grep, Sort, Unique, WordCount,
-    TokenCount, ExtractKeys, ExtractValues, FilterTokens,
     Sed, SedLines,
 };
+
+// Re-export the streamable! macro
+pub use crate::streamable;
 pub use crate::streams::Stream;
 pub use crate::time::*;
 pub use crate::utils::*;

@@ -15,8 +15,6 @@ pub use functions::{
     Base64Encode, Base64Decode, UrlEncode, UrlDecode,
     // Unix-style streamables
     Head, Tail, Grep, Sort, Unique, WordCount,
-    // Token-specific streamables  
-    TokenCount, ExtractKeys, ExtractValues, FilterTokens,
     // RSB integration streamables
     Sed, SedLines,
     // Function-style interfaces

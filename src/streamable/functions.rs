@@ -129,36 +129,8 @@ streamable!(WordCount(stdin,) => {
     format!("{} {} {}", lines, words, chars)
 });
 
-// === TOKEN-SPECIFIC STREAMABLES ===
-
-streamable!(TokenCount(stdin,) => {
-    stdin.split(';').filter(|s| !s.trim().is_empty()).count().to_string()
-});
-
-streamable!(ExtractKeys(stdin,) => {
-    stdin.split(';')
-        .filter_map(|token| {
-            token.trim().split('=').next().map(|s| s.trim())
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-});
-
-streamable!(ExtractValues(stdin,) => {
-    stdin.split(';')
-        .filter_map(|token| {
-            token.trim().split('=').nth(1).map(|s| s.trim_matches('"').trim_matches('\''))
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-});
-
-streamable!(FilterTokens(stdin, key_contains: String) => {
-    stdin.split(';')
-        .filter(|token| token.contains(&key_contains))
-        .collect::<Vec<_>>()
-        .join("; ")
-});
+// Note: Token-specific streamables moved to xstream/types/streamable
+// RSB focuses on general text processing, xstream handles token semantics
 
 // === RSB INTEGRATION STREAMABLES ===
 
