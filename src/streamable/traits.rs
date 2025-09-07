@@ -31,3 +31,4 @@ impl StreamApply for &str {
         self // Just return self for now - not ideal but fixes compile
     }
 }
+

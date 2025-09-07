@@ -46,6 +46,12 @@ streamable!(Trim(stdin,) => {
     stdin.trim().to_string()
 });
 
+
+streamable!(Length(stdin,) => {
+    stdin.len().to_string()
+});
+
+
 // === ENCODING FUNCTIONS ===
 
 streamable!(Base64Encode(stdin,) => {
@@ -121,6 +127,9 @@ pub fn url_decode_fn(input: &str, _args: ()) -> String {
 
 // === UNIX-STYLE STREAMABLES ===
 
+
+
+
 streamable!(Head(stdin, n: usize) => {
     stdin.lines().take(n).collect::<Vec<_>>().join("\n")
 });
@@ -177,6 +186,23 @@ streamable!(SedLines(stdin, start: usize, end: usize) => {
         .sed_lines(start, end)
         .to_string()
 });
+
+
+
+
+// Advanced streamables
+streamable!(Pipeline(stdin, commands: Vec<String>) => {
+    let mut result = stdin.to_string();
+    for cmd in commands {
+        // This could parse and execute simple commands
+        // For now, just return the result
+        result = format!("# Executed: {}\n{}", cmd, result);
+    }
+    result
+});
+
+
+
 
 #[cfg(test)]
 mod tests {

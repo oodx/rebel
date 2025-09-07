@@ -10,7 +10,7 @@ pub use traits::{Streamable, StreamApply};
 // Re-export basic streamable structs
 pub use functions::{
     // Basic text transforms
-    Replace, UpperCase, LowerCase, Trim, Reverse,
+    Replace, UpperCase, LowerCase, Trim, Reverse, Length,
     // Encoding transforms
     Base64Encode, Base64Decode, UrlEncode, UrlDecode,
     // Unix-style streamables
