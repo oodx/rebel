@@ -11,11 +11,13 @@
 //! ```
 
 // Re-export selected external crates used internally by rsb
+pub use base64;
 pub use chrono;
 pub use glob;
 pub use lazy_static;
 pub use libc;
 pub use rand;
 pub use regex;
+pub use urlencoding;
 pub use uuid;
 

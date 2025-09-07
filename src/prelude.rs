@@ -13,9 +13,11 @@ pub use crate::context::{
 };
 pub use crate::fs::*;
 pub use crate::os::*;
+pub use crate::streamable::{Streamable, StreamApply};
 pub use crate::streams::Stream;
 pub use crate::time::*;
 pub use crate::utils::*;
+pub use crate::xcls::{xsed, XSed, ToXSed};
 pub use crate::random::*;
 pub use crate::math::*;
 
