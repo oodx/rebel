@@ -89,6 +89,36 @@ pub fn lowercase_fn(input: &str, _args: ()) -> String {
     LowerCase::stream_apply(input, ())
 }
 
+/// Function-style interface for reverse
+pub fn reverse_fn(input: &str, _args: ()) -> String {
+    Reverse::stream_apply(input, ())
+}
+
+/// Function-style interface for trim
+pub fn trim_fn(input: &str, _args: ()) -> String {
+    Trim::stream_apply(input, ())
+}
+
+/// Function-style interface for base64 encode
+pub fn base64_encode_fn(input: &str, _args: ()) -> String {
+    Base64Encode::stream_apply(input, ())
+}
+
+/// Function-style interface for base64 decode
+pub fn base64_decode_fn(input: &str, _args: ()) -> String {
+    Base64Decode::stream_apply(input, ())
+}
+
+/// Function-style interface for URL encode
+pub fn url_encode_fn(input: &str, _args: ()) -> String {
+    UrlEncode::stream_apply(input, ())
+}
+
+/// Function-style interface for URL decode
+pub fn url_decode_fn(input: &str, _args: ()) -> String {
+    UrlDecode::stream_apply(input, ())
+}
+
 // === UNIX-STYLE STREAMABLES ===
 
 streamable!(Head(stdin, n: usize) => {

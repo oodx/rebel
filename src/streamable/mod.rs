@@ -18,7 +18,8 @@ pub use functions::{
     // RSB integration streamables
     Sed, SedLines,
     // Function-style interfaces
-    replace_fn, uppercase_fn, lowercase_fn,
+    replace_fn, uppercase_fn, lowercase_fn, reverse_fn, trim_fn,
+    base64_encode_fn, base64_decode_fn, url_encode_fn, url_decode_fn,
 };
 
 // Re-export the streamable! macro
