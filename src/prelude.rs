@@ -13,7 +13,15 @@ pub use crate::context::{
 };
 pub use crate::fs::*;
 pub use crate::os::*;
-pub use crate::streamable::{Streamable, StreamApply};
+pub use crate::streamable::{
+    Streamable, StreamApply,
+    // Advanced streamables for Pattern 2 & 3 composability
+    Replace, UpperCase, LowerCase, Trim, Reverse,
+    Base64Encode, Base64Decode, UrlEncode, UrlDecode,
+    Head, Tail, Grep, Sort, Unique, WordCount,
+    TokenCount, ExtractKeys, ExtractValues, FilterTokens,
+    Sed, SedLines,
+};
 pub use crate::streams::Stream;
 pub use crate::time::*;
 pub use crate::utils::*;

@@ -89,6 +89,93 @@ pub fn lowercase_fn(input: &str, _args: ()) -> String {
     LowerCase::stream_apply(input, ())
 }
 
+// === UNIX-STYLE STREAMABLES ===
+
+streamable!(Head(stdin, n: usize) => {
+    stdin.lines().take(n).collect::<Vec<_>>().join("\n")
+});
+
+streamable!(Tail(stdin, n: usize) => {
+    let lines: Vec<&str> = stdin.lines().collect();
+    lines.iter().skip(lines.len().saturating_sub(n)).cloned().collect::<Vec<_>>().join("\n")
+});
+
+streamable!(Grep(stdin, pattern: String) => {
+    stdin.lines()
+        .filter(|line| line.contains(&pattern))
+        .collect::<Vec<_>>()
+        .join("\n")
+});
+
+streamable!(Sort(stdin,) => {
+    let mut lines: Vec<&str> = stdin.lines().collect();
+    lines.sort();
+    lines.join("\n")
+});
+
+streamable!(Unique(stdin,) => {
+    use std::collections::HashSet;
+    let mut seen = HashSet::new();
+    stdin.lines()
+        .filter(|line| seen.insert(*line))
+        .collect::<Vec<_>>()
+        .join("\n")
+});
+
+streamable!(WordCount(stdin,) => {
+    let lines = stdin.lines().count();
+    let words = stdin.split_whitespace().count(); 
+    let chars = stdin.chars().count();
+    format!("{} {} {}", lines, words, chars)
+});
+
+// === TOKEN-SPECIFIC STREAMABLES ===
+
+streamable!(TokenCount(stdin,) => {
+    stdin.split(';').filter(|s| !s.trim().is_empty()).count().to_string()
+});
+
+streamable!(ExtractKeys(stdin,) => {
+    stdin.split(';')
+        .filter_map(|token| {
+            token.trim().split('=').next().map(|s| s.trim())
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+});
+
+streamable!(ExtractValues(stdin,) => {
+    stdin.split(';')
+        .filter_map(|token| {
+            token.trim().split('=').nth(1).map(|s| s.trim_matches('"').trim_matches('\''))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+});
+
+streamable!(FilterTokens(stdin, key_contains: String) => {
+    stdin.split(';')
+        .filter(|token| token.contains(&key_contains))
+        .collect::<Vec<_>>()
+        .join("; ")
+});
+
+// === RSB INTEGRATION STREAMABLES ===
+
+streamable!(Sed(stdin, pattern: String, replacement: String) => {
+    use crate::streams::Stream;
+    Stream::from_string(stdin)
+        .sed(&pattern, &replacement)
+        .to_string()
+});
+
+streamable!(SedLines(stdin, start: usize, end: usize) => {
+    use crate::streams::Stream;
+    Stream::from_string(stdin)
+        .sed_lines(start, end)
+        .to_string()
+});
+
 #[cfg(test)]
 mod tests {
     use super::*;
