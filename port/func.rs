@@ -1,4 +1,4 @@
-use rsb::prelude::*;
+use rsb::preamble::*;
 
 // RSB port of func.sh - Function extraction and management utility
 // Maintains same command interface as the original BashFX utility

@@ -903,3 +903,76 @@ RSB/REBEL follows the paradigm of **"Good Enough"** engineering - also known as 
 The goal isn't to avoid Rust's power, but to harness it without requiring a PhD in type theory. Sometimes you just need to process some logs, check some files, or automate a workflow. You shouldn't need to architect the next Mars rover just to write a backup script.
 
 *"The best architecture is the one that gets used by practitioners who solve real problems without having to decode academic hieroglyphics first. Everything is a string, everything works, and nobody gets hurt in the process."*
+
+---
+
+## Amendment A: RSB Import Hierarchy Patterns
+
+**Added**: 2025-09-07  
+**Context**: Clarification based on ProntoDB project implementation experience
+
+### RSB Prelude Import Strategy
+
+RSB projects should follow a **single-entry-point** pattern for RSB framework imports to avoid redundant prelude declarations across the codebase.
+
+#### ✅ **Recommended Pattern**
+```rust
+// main.rs - Single RSB entry point
+use rsb::prelude::*;
+
+// lib modules - use crate imports for RSB functionality
+// src/myapp/config.rs
+use crate::rsb;  // or similar crate-specific import pattern
+
+pub fn do_load_config() -> String { 
+    // RSB macros available via crate import
+    param!("CONFIG_PATH", default: "config.toml")
+}
+
+// src/myapp/utils.rs  
+use crate::rsb;  // inherit RSB through crate import
+
+pub fn _helper_process_file(path: &str) -> String {
+    // RSB functionality via crate import
+    validate!(!path.is_empty(), "Path cannot be empty");
+    // ... implementation
+}
+```
+
+#### ❌ **Anti-Pattern: Multiple RSB Imports**
+```rust
+// main.rs
+use rsb::prelude::*;
+
+// config.rs - REDUNDANT  
+use rsb::prelude::*;  
+
+// utils.rs - REDUNDANT
+use rsb::prelude::*;
+```
+
+#### ⚠️ **Exception: Test Files**
+Test files that directly test RSB functionality may require their own RSB imports since they don't inherit from main.rs:
+
+```rust
+// tests/config_tests.rs - Exception case
+use rsb::prelude::*;  // OK for testing RSB patterns
+
+#[test]
+fn test_config_param_expansion() {
+    let result = param!("TEST_VAR", default: "test");
+    assert_eq!(result, "test");
+}
+```
+
+### **Implementation Notes**
+
+- **Single Source of Truth**: main.rs serves as the RSB gateway for the entire application
+- **Cleaner Module Files**: Reduces import noise and maintains focus on business logic  
+- **Crate Import Pattern**: Modules use `use crate::rsb` or similar patterns to access RSB functionality
+- **Testing Flexibility**: Test files can import RSB directly when testing RSB-specific functionality
+
+This pattern reduces boilerplate while maintaining RSB's string-first philosophy throughout the codebase.
+
+---
+*RSB Architecture Framework - Amendment A*

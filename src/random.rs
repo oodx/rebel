@@ -52,3 +52,6 @@ pub fn get_rand_uuid() -> String {
 pub fn get_rand_from_slice(words: &[String]) -> Option<String> {
     words.choose(&mut rand::thread_rng()).cloned()
 }
+
+
+///TODO: support jynx/boxy stderr colors
