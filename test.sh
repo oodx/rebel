@@ -75,6 +75,20 @@ macros_coverage() {
     awk -F'\|' '{printf "  %-24s %s\n", $1, $3}'
 }
 
+# Verbose mode: show per-file test refs
+if [ "${VERBOSE:-}" != "" ]; then
+  per_file_refs() {
+    echo "Per-file test references:"; echo
+    while IFS= read -r line; do
+      file=$(echo "$line" | awk -F'|' '{print $1}' | xargs)
+      stem=$(basename "$file" .rs)
+      echo "- $file"
+      rg -n --no-heading -S "\\b${stem}\\b" tests || true
+      echo
+    done < <(rg --files src | sort)
+  }
+fi
+
 # 4) Summarize failures
 fail_summary() {
   local out_file="target/test-output.log"
@@ -105,6 +119,10 @@ section "Inventory Summary" "$coverage_text"
 
 macro_text=$(macros_coverage)
 section "Macros Coverage" "$macro_text"
+if [ "${VERBOSE:-}" != "" ]; then
+  v_text=$(per_file_refs)
+  section "Verbose: Per-File Test Refs" "$v_text"
+fi
 
 set +e
 run_tests
