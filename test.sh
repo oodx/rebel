@@ -67,6 +67,14 @@ coverage_summary() {
   rg -n "tests:0" test_inventory.log | sed -n '1,20p' | sed 's/^\([0-9]*:\)//'
 }
 
+# 3b) Macros coverage focus
+macros_coverage() {
+  echo "Macro files coverage:"
+  awk '/^src\/macros\//{print}' test_inventory.log |
+    sed 's/^src\/macros\///' |
+    awk -F'\|' '{printf "  %-24s %s\n", $1, $3}'
+}
+
 # 4) Summarize failures
 fail_summary() {
   local out_file="target/test-output.log"
@@ -95,6 +103,9 @@ inv_gen
 coverage_text=$(coverage_summary)
 section "Inventory Summary" "$coverage_text"
 
+macro_text=$(macros_coverage)
+section "Macros Coverage" "$macro_text"
+
 set +e
 run_tests
 rc=$?
@@ -113,4 +124,3 @@ else
 fi
 
 exit $rc
-
