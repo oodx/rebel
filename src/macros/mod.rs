@@ -2,7 +2,7 @@
 pub mod core;
 pub mod routing;
 pub mod streams_exec;
-pub mod io_output;
+pub mod stderr;
 pub mod text;
 pub mod time_math;
 pub mod fs_data;
