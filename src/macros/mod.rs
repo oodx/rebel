@@ -1,6 +1,6 @@
 // Grouped macro modules. All macros use `#[macro_export]` and are exported at crate root.
 pub mod core;
-pub mod routing;
+pub mod dispatch;
 pub mod streams_exec;
 pub mod stderr;
 pub mod text;

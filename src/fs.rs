@@ -252,6 +252,28 @@ pub fn path_split(path: &str) -> std::collections::HashMap<String, String> {
     map
 }
 
+/// Parses metadata keys from a file's leading comment lines and populates context variables.
+/// Supported formats: lines starting with '#' and containing `key: value` or `key : value`.
+pub fn parse_meta_keys(path: &str, into: &str) {
+    let content = read_file(path);
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        if !trimmed.starts_with('#') {
+            // Stop at first non-comment line to mimic header parsing.
+            break;
+        }
+        let rest = trimmed.trim_start_matches('#').trim();
+        if rest.is_empty() { continue; }
+        if let Some((k, v)) = rest.split_once(':') {
+            let key = k.trim();
+            let value = v.trim();
+            if !key.is_empty() {
+                crate::context::set_var(&format!("{}_{}", into, key), value);
+            }
+        }
+    }
+}
+
 
 // --- File System Test Functions ---
 

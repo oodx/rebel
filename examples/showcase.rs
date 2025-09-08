@@ -394,6 +394,45 @@ fn sed_test(_args: Args) -> i32 {
     0
 }
 
+
+fn sed_block_test(_args: Args) -> i32 {
+    let content = "
+    # Other file content
+    <config>
+        <setting>old_value</setting>
+    </config>
+    # More content
+    ";
+
+    // Test replacing content within the block
+    let result1 = pipe!(content)
+        .sed_block("<config>", "</config>", "s/old_value/new_value/g")
+        .to_string();
+    echo!("--- Test 1: Replace 'old_value' ---\n{}", result1);
+
+    // Test with no end pattern
+    let result2 = pipe!(content)
+        .sed_block("<config>", "NO_SUCH_END", "s/old_value/new_value/g")
+        .to_string();
+    if result2.contains("old_value") {
+        echo!("Unclosed block contains: old_value");
+    }
+    echo!("--- Test 2: No end pattern ---\n{}", result2);
+
+    0
+}
+
+fn color_test(_args: Args) -> i32 {
+    info!("This is an info message.");
+    okay!("This is an okay message.");
+    warn!("This is a warning message.");
+    error!("This is an error message.");
+    fatal!("This is a fatal message.");
+    debug!("This is a debug message.");
+    trace!("This is a trace message.");
+    0
+}
+
 fn archive_test(_args: Args) -> i32 {
     info!("Testing archive operations...");
     

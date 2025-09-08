@@ -7,7 +7,9 @@ macro_rules! dispatch {
         {
           let args_vec: &Vec<String> = $args;
           let command = args_vec.get(1).map(|s| s.as_str()).unwrap_or("help");
-          let cmd_args = $crate::args::Args::new(&args_vec[2..]);
+          // Safely forward all args after the command (if present)
+          let start_idx = if args_vec.len() > 2 { 2 } else { args_vec.len() };
+          let cmd_args = $crate::args::Args::new(&args_vec[start_idx..]);
           $( $crate::context::register_function($cmd, stringify!($handler)); )*
           
           match command {
@@ -51,7 +53,9 @@ macro_rules! pre_dispatch {
             
             match command {
                 $($cmd => {
-                    let cmd_args = $crate::args::Args::new(&args_vec[2..]);
+                    // Safely forward all args after the command
+                    let start_idx = if args_vec.len() > 2 { 2 } else { args_vec.len() };
+                    let cmd_args = $crate::args::Args::new(&args_vec[start_idx..]);
                     $crate::context::push_call($cmd, cmd_args.all());
                     let result = $handler(cmd_args);
                     $crate::context::pop_call();

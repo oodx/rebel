@@ -42,11 +42,12 @@ pub use crate::{
     kill_pid, kill_process, load_config, lock, math, mock_cmd, okay, pack, param,
     pid_of, pipe, pre_dispatch, printf, process_exists,
     rand_alnum, rand_alpha, rand_dict, rand_hex, rand_string, rand_uuid,
+    rand_range,
     readline, require_command, require_dir, require_file, require_var, sed_around, sed_around_file,
     sed_insert, sed_insert_file, sed_lines, sed_lines_file, sed_replace, sed_template,
     sed_template_file, run, shell, src, stderr, stream, str_explode, str_in, str_len,
-    str_trim, subst, tar, tar_gz, test, tmp, to_number, trace, trap, unpack, unlock, user, validate, warn,
-    with_lock, zip,
+    str_trim, str_line, subst, tar, tar_gz, test, tmp, to_number, trace, trap, unpack, unlock, user, validate, warn,
+    with_lock, zip, sleep, path_canon, path_split, meta_keys,
 };
 
 // Re-export macro groups for selective imports via the prelude.

@@ -1,0 +1,36 @@
+# Test Inventory (auto-generated)
+# Format: <src_path> | stem=<name> | tests:<count> [files]
+
+src/args.rs | stem=args | tests:4 [tests/cli.rs tests/dispatch.rs tests/final_utils.rs tests/new_features.rs]
+src/context.rs | stem=context | tests:0 
+src/deps.rs | stem=deps | tests:0 
+src/fs.rs | stem=fs | tests:7 [tests/cli.rs tests/new_features.rs]
+src/lib.rs | stem=lib | tests:0 
+src/macros/control_validation.rs | stem=control_validation | tests:0 
+src/macros/core.rs | stem=core | tests:0 
+src/macros/dispatch.rs | stem=dispatch | tests:0 
+src/macros/fs_data.rs | stem=fs_data | tests:0 
+src/macros/jobs_events.rs | stem=jobs_events | tests:0 
+src/macros/json_dict_random.rs | stem=json_dict_random | tests:0 
+src/macros/mod.rs | stem=mod | tests:0 
+src/macros/stderr.rs | stem=stderr | tests:10 [tests/cli.rs tests/dispatch.rs tests/new_features.rs]
+src/macros/streams_exec.rs | stem=streams_exec | tests:0 
+src/macros/test_helpers.rs | stem=test_helpers | tests:0 
+src/macros/text.rs | stem=text | tests:0 
+src/macros/time_math.rs | stem=time_math | tests:0 
+src/math.rs | stem=math | tests:1 [tests/new_features.rs]
+src/os.rs | stem=os | tests:0 
+src/prelude.rs | stem=prelude | tests:10 [tests/cli.rs tests/dispatch.rs tests/final_utils.rs tests/new_features.rs]
+src/random.rs | stem=random | tests:3 [tests/final_utils.rs tests/new_features.rs]
+src/streamable/detectors.rs | stem=detectors | tests:0 
+src/streamable/filters.rs | stem=filters | tests:0 
+src/streamable/functions.rs | stem=functions | tests:2 [tests/cli.rs tests/new_features.rs]
+src/streamable/mod.rs | stem=mod | tests:0 
+src/streamable/traits.rs | stem=traits | tests:0 
+src/streams.rs | stem=streams | tests:0 
+src/time.rs | stem=time | tests:0 
+src/utils.rs | stem=utils | tests:0 
+src/xcls/mod.rs | stem=mod | tests:0 
+src/xcls/xfilter.rs | stem=xfilter | tests:0 
+src/xcls/xgrep.rs | stem=xgrep | tests:0 
+src/xcls/xsed.rs | stem=xsed | tests:0 

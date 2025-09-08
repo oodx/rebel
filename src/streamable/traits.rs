@@ -12,23 +12,20 @@ pub trait Streamable {
 
 /// StreamApply trait - adds .stream_apply() method to any type
 pub trait StreamApply {
-    fn stream_apply<S: Streamable>(self, streamable: S, args: S::Args) -> Self;
+    fn stream_apply<S: Streamable>(self, streamable: S, args: S::Args) -> String;
 }
 // We'll implement this for specific types that need it!
 
 // Implementation for String - enables direct string pipeline usage
 impl StreamApply for String {
-    fn stream_apply<S: Streamable>(self, _streamable: S, args: S::Args) -> Self {
+    fn stream_apply<S: Streamable>(self, _streamable: S, args: S::Args) -> String {
         S::stream_apply(&self, args)
     }
 }
 
 // Implementation for &str convenience
 impl StreamApply for &str {
-    fn stream_apply<S: Streamable>(self, _streamable: S, _args: S::Args) -> Self {
-        // This is a workaround since we can't return a reference to a local String
-        // In practice, users should use String::stream_apply for chaining
-        self // Just return self for now - not ideal but fixes compile
+    fn stream_apply<S: Streamable>(self, _streamable: S, args: S::Args) -> String {
+        S::stream_apply(self, args)
     }
 }
-

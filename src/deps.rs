@@ -6,7 +6,7 @@
 //!
 //! Example:
 //! ```rust
-//! use rsb::deps::rand::{Rng, distributions::Alphanumeric};
+//! use rsb::deps::rand::{Rng, distr::Alphanumeric};
 //! use rsb::deps::lazy_static::lazy_static;
 //! ```
 
@@ -20,4 +20,3 @@ pub use rand;
 pub use regex;
 pub use urlencoding;
 pub use uuid;
-

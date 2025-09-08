@@ -1,6 +1,6 @@
 // --- Conversion / Text Macros ---
 // Namespaced re-exports for selective imports
-pub use crate::{to_number, param, str_in, str_explode, str_trim, str_len};
+pub use crate::{to_number, param, str_in, str_explode, str_trim, str_len, str_line};
 #[macro_export]
 macro_rules! to_number {
     ($text:expr) => {
@@ -74,4 +74,12 @@ macro_rules! str_len {
     ($var:expr) => {
         $crate::context::get_var($var).len()
     };
+}
+
+#[macro_export]
+macro_rules! str_line {
+    ($ch:expr, $n:expr) => {{
+        let c: char = $ch;
+        std::iter::repeat(c).take($n as usize).collect::<String>()
+    }};
 }

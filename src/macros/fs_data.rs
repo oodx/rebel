@@ -1,6 +1,6 @@
 // --- File System & Temp Macros ---
 // Namespaced re-exports for selective imports
-pub use crate::{chmod, backup, tmp, cap_stream, subst, sed_lines, sed_around, sed_insert, sed_template, sed_replace, sed_lines_file, sed_around_file, sed_insert_file, sed_template_file, tar, tar_gz, zip, pack, unpack};
+pub use crate::{chmod, backup, tmp, cap_stream, subst, sed_lines, sed_around, sed_insert, sed_template, sed_replace, sed_lines_file, sed_around_file, sed_insert_file, sed_template_file, tar, tar_gz, zip, pack, unpack, path_canon, path_split, meta_keys};
 #[macro_export]
 macro_rules! chmod {
     ($path:expr, $mode:expr) => {
@@ -198,6 +198,37 @@ macro_rules! zip {
             }
         }
     }};
+    (extract: $archive:expr) => {{
+        match $crate::os::extract_zip($archive, None) {
+            result if result.status == 0 => {
+                $crate::okay!("Extracted zip archive: {}", $archive);
+            },
+            result => {
+                $crate::error!("Failed to extract zip: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    (extract: $archive:expr, to: $dest:expr) => {{
+        match $crate::os::extract_zip($archive, Some($dest)) {
+            result if result.status == 0 => {
+                $crate::okay!("Extracted zip archive to: {}", $dest);
+            },
+            result => {
+                $crate::error!("Failed to extract zip: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
+    (list: $archive:expr) => {{
+        match $crate::os::list_zip($archive) {
+            result if result.status == 0 => result.output,
+            result => {
+                $crate::error!("Failed to list zip: {}", result.error);
+                std::process::exit(result.status);
+            }
+        }
+    }};
 }
 
 // Simple pack macro that auto-detects format from extension
@@ -215,6 +246,32 @@ macro_rules! pack {
             $crate::error!("Unsupported archive format: {}", archive_path);
             std::process::exit(1);
         }
+    }};
+}
+
+// --- Path utility macros ---
+#[macro_export]
+macro_rules! path_canon {
+    ($path:expr) => {{
+        $crate::fs::path_canon($path).unwrap_or_default()
+    }};
+}
+
+#[macro_export]
+macro_rules! path_split {
+    ($path:expr, into: $name:expr) => {{
+        let parts = $crate::fs::path_split($path);
+        for (k, v) in parts.into_iter() {
+            $crate::context::set_var(&format!("{}_{}", $name, k), &v);
+        }
+    }};
+}
+
+// --- Metadata parsing macro ---
+#[macro_export]
+macro_rules! meta_keys {
+    ($path:expr, into: $name:expr) => {{
+        $crate::fs::parse_meta_keys($path, $name);
     }};
 }
 

@@ -80,7 +80,10 @@ fn test_math_macro() {
 #[test]
 fn test_cap_stream_macro() {
     let mut cmd = get_example_cmd();
+    // Use a writable temp directory for XDG_TMP
+    let tmp = std::env::temp_dir();
     cmd.env("CARGO_TEST", "1") // Explicitly mark as test environment
+       .env("XDG_TMP", tmp.to_string_lossy().to_string())
        .arg("cap-stream-test");
     cmd.assert()
         .success()

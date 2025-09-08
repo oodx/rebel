@@ -330,7 +330,8 @@ fn setup_xdg_paths() {
     set_var("XDG_ETC_HOME", &expand_vars("$XDG_HOME/etc")); 
     set_var("XDG_BIN_HOME", &expand_vars("$XDG_HOME/bin"));
     set_var("XDG_DATA_HOME", &expand_vars("$XDG_HOME/data"));  // Override XDG(0) for BashFX preference
-    set_var("XDG_TMP", &expand_vars("$HOME/.cache/tmp"));
+    // Respect existing XDG_TMP if provided in the environment/context
+    set_var("XDG_TMP", &expand_vars("${XDG_TMP:-$HOME/.cache/tmp}"));
 }
 fn setup_rsb_paths() {
     // RSB library provides standard paths for RSB tools (not forced, just available)

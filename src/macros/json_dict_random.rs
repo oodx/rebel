@@ -1,6 +1,6 @@
 // --- JSON Macros (requires jq) ---
 // Namespaced re-exports for selective imports
-pub use crate::{json_get, json_get_file, dict, rand_dict, gen_dict, rand_alnum, rand_alpha, rand_hex, rand_string, rand_uuid};
+pub use crate::{json_get, json_get_file, dict, rand_dict, gen_dict, rand_alnum, rand_alpha, rand_hex, rand_string, rand_uuid, rand_range};
 #[macro_export]
 macro_rules! json_get {
     ($json:expr, $path:expr) => {
@@ -100,4 +100,12 @@ macro_rules! rand_uuid {
     () => {
         $crate::random::get_rand_uuid()
     };
+}
+
+// --- Simple random range macro (inclusive) ---
+#[macro_export]
+macro_rules! rand_range {
+    ($min:expr, $max:expr) => {{
+        $crate::random::rand_range_usize($min as usize, $max as usize)
+    }};
 }

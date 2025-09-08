@@ -1,6 +1,6 @@
 // --- Benchmarking & Time Macros ---
 // Namespaced re-exports for selective imports
-pub use crate::{benchmark, date, math};
+pub use crate::{benchmark, date, math, sleep};
 #[macro_export]
 macro_rules! benchmark {
     ($body:block) => {
@@ -44,4 +44,14 @@ macro_rules! math {
             }
         }
     };
+}
+
+#[macro_export]
+macro_rules! sleep {
+    ($secs:expr) => {{
+        std::thread::sleep(std::time::Duration::from_secs($secs as u64));
+    }};
+    (ms: $millis:expr) => {{
+        std::thread::sleep(std::time::Duration::from_millis($millis as u64));
+    }};
 }

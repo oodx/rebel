@@ -200,6 +200,7 @@ mod tests {
         let result = xsed("key=\"hello\"; user=\"world\"")
             .transform_values(|v| v.to_uppercase())
             .to_string();
-        assert_eq!(result, "key=\"HELLO\";user=\"WORLD\"");
+        // Preserve original spacing between tokens
+        assert_eq!(result, "key=\"HELLO\"; user=\"WORLD\"");
     }
 }
