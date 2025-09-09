@@ -1,0 +1,215 @@
+RSB ARCHITECTURE PATTERNS & IMPLEMENTATION GUIDE
+===============================================
+
+Date: 2025-09-08
+Target: RSB Architecture & Implementation Patterns
+Source: docs/RSB_COMPREHENSIVE_GUIDE.md, docs/RSB_FOUNDATION_ANALYSIS.md
+
+MACRO SYSTEM - THE RSB COMMAND CENTER
+=====================================
+
+1. APPLICATION LIFECYCLE MACROS
+-------------------------------
+Standard RSB application structure:
+
+```rust
+fn main() {
+    let args = bootstrap!();           // Initialize context, load environment
+    
+    pre_dispatch!(&args, {            // Early commands (before config)
+        "install" => do_install,
+        "init" => do_init
+    });
+    
+    src!("~/.config/app/config.conf"); // Load configs
+    
+    dispatch!(&args, {                // Main command routing
+        "build" => do_build,
+        "deploy" => do_deploy
+    });
+}
+```
+
+2. STREAM PROCESSING MACROS
+---------------------------
+Unix-like stream operations:
+
+Stream Creation (Sources):
+• cat!(path, ...) - Read files into stream
+• cmd!(command) - Command output to stream
+• pipe!(string) - String/variable to stream
+• stream!(var: "NAME") - Variable to stream
+
+Stream Operations:
+• .grep(pattern) - Filter lines
+• .sed(from, to) - String replacement
+• .cut(field, delim) - Extract fields
+• .sort() / .unique() - Sort and deduplicate
+• .head(n) / .tail(n) - Take first/last n lines
+
+Stream Consumption (Sinks):
+• .to_string() - Single string result
+• .to_vec() - Vector of lines
+• .to_file(path) - Write to file
+
+3. PARAMETER EXPANSION (param!)
+-------------------------------
+Bash-compatible variable operations:
+• param!("VAR") - Basic $VAR expansion
+• param!("VAR", default: "val") - ${VAR:-val}
+• param!("VAR", len) - ${#VAR} string length
+• param!("VAR", upper) - ${VAR^^} uppercase
+• param!("VAR", replace: "a" => "b") - ${VAR/a/b}
+
+4. VALIDATION & TESTING MACROS
+------------------------------
+• test!(-f path) - File exists
+• test!(-d path) - Directory exists
+• test!(str, =~, pattern) - Regex match
+• validate!(condition, msg) - Exit if false
+• require_file!(path) - Exit if not file
+• require_var!(var) - Exit if variable not set
+
+STRING-FIRST IMPLEMENTATION PATTERNS
+===================================
+
+1. STREAM PROCESSING EXAMPLE
+----------------------------
+Log analysis pipeline:
+```rust
+let unique_ips = cat!("access.log")
+    .grep(r"\d+\.\d+\.\d+\.\d+")        // Find IP patterns
+    .cut(1, " ")                        // Extract first field  
+    .filter(|ip| !ip.starts_with("192.168")) // Remove private IPs
+    .sort()                             // Sort addresses
+    .unique()                           // Remove duplicates
+    .to_vec();                          // Collect results
+```
+
+2. CONFIGURATION PROCESSING
+---------------------------
+```rust
+let valid_configs = cat!("config1.conf", "config2.conf")
+    .grep("^[A-Z_]+=")                  // Find assignments
+    .filter(|line| !line.starts_with("#")) // Remove comments
+    .map(|line| line.trim().to_string())     // Clean whitespace
+    .to_string();
+```
+
+PROJECT STRUCTURE REQUIREMENTS
+===============================
+
+STANDARD RSB PROJECT LAYOUT:
+```
+src/
+├── main.rs              // Entry point with RSB bootstrap
+├── lib.rs               // Optional library interface
+├── prelude.rs           // User convenience imports
+├── myapp.rs             // Nice neighbor for myapp/ directory
+├── myapp/               // Implementation namespace
+│   ├── core.rs          // Business logic (_helper functions)
+│   ├── utils.rs         // Low-level utilities (__blind_faith functions)
+│   ├── adapters/        // Type abstraction layer (optional)
+│   │   ├── mod.rs       
+│   │   ├── database.rs  // SQL abstraction
+│   │   └── http.rs      // HTTP client abstraction  
+│   └── queries/         // SQL files (when using database adapter)
+└── tests/               // Integration tests
+```
+
+MODULE INTERFACE STANDARDS:
+• lib.rs: Public API only, re-export user-facing items
+• prelude.rs: Convenience imports including RSB framework
+• DON'T export adapters - they're implementation details
+
+FUNCTION ORDINALITY DISCIPLINE
+===============================
+
+THREE-TIER HIERARCHY ENFORCEMENT:
+
+```rust
+// ✅ PUBLIC API (User fault handling)
+pub fn do_process_logs(args: Args) -> i32 {
+    let input_file = args.get_or(1, "access.log");
+    
+    if input_file.is_empty() {
+        fatal!("Input file required: ./tool process <logfile>");
+    }
+    
+    if !test!(-f input_file) {
+        fatal!("File not found: {}", input_file);
+    }
+    
+    let errors = _extract_errors(&input_file);    // Delegate to mid-level
+    0
+}
+
+// ✅ CRATE-INTERNAL (App fault handling)  
+fn _extract_errors(file: &str) -> String {
+    let content = cat!(file);
+    
+    if content.is_empty() {
+        error!("Log file is empty, no errors to extract");
+        return String::new();
+    }
+    
+    content.grep("ERROR").to_string()
+}
+
+// ✅ LOW-LEVEL (System fault handling)
+fn __send_raw_notification(message: &str) {
+    let result = std::process::Command::new("notify-send")
+        .arg(message)
+        .status();
+        
+    if let Err(e) = result {
+        error!("System notification failed: {}", e);
+    }
+}
+```
+
+PRONTODB SPECIFIC PATTERNS
+===========================
+
+1. ADDRESS PARSER (String-First)
+--------------------------------
+```rust
+pub fn parse_address(addr: &str) -> String {
+    validate!(addr.contains('.'), "Address must contain namespace delimiter");
+    // Return JSON string with parsed components
+}
+```
+
+2. KV OPERATIONS (Three-Tier)
+-----------------------------
+```rust
+pub fn api_set(addr: &str, val: &str) -> String;
+fn _helper_set(components: &str, val: &str) -> String;
+fn __blind_faith_insert(table: &str, key: &str, val: &str) -> String;
+```
+
+3. STREAM PROCESSING (RSB Macro-Based)
+--------------------------------------
+```rust
+pub fn api_stream() -> String {
+    let input = cat!("-");  // Read stdin
+    let validated = input.grep("meta:sec:pass=").validate_auth();
+    // Process with RSB stream macros
+}
+```
+
+4. SQLITE INTEGRATION (String-Parameterized)
+--------------------------------------------
+```rust
+fn __blind_faith_query(sql: &str, params: &str) -> String {
+    // String-based SQL parameters, return JSON string
+}
+```
+
+🐔 Summary Status: COMPREHENSIVE IMPLEMENTATION GUIDE
+This egg provides the architectural patterns and implementation guidance needed for RSB-compliant development.
+
+DISCLAIMER
+----------
+⚠️ This summary reflects documented RSB architecture patterns.
+Implementation details may need verification with actual RSB framework code and current ProntoDB state.

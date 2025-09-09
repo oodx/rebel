@@ -1,11 +1,15 @@
-# RSB Architecture Framework 
+# RSB Architecture Framework v1.2
 
 **RSB** (Rebel String-Biased Architecture) provides systematic patterns for building accessible, maintainable Rust tools following the **REBEL** (Rust Equalized Beyond Esoteric Lingo) philosophy.
 
 RSB is inspired by and builds upon **BashFX** - a mature bash scripting architecture that emphasizes function ordinality, rewindable operations, and systematic script organization. BashFX has proven itself through years of production bash script development, providing battle-tested patterns for building maintainable automation tools.
 
+
+> NOTE: Important RSB references and patterns have been moved to `docs/references` and `docs/patterns` respectively. Tactical summaries in `docs/tactical`
+
+
 RSB translates BashFX's proven architectural concepts into Rust, maintaining the same emphasis on:
-- **Function ordinality** (clear responsibility hierarchy)
+- **Function ordinality** (clear responsibility hierarchy) 
 - **String-biased operations** (opinionated preference for simple interfaces)
 - **Systematic organization** (predictable project structure)
 - **Developer accessibility** (practical patterns over academic abstractions)
@@ -906,7 +910,7 @@ The goal isn't to avoid Rust's power, but to harness it without requiring a PhD 
 
 ---
 
-## Amendment A: RSB Import Hierarchy Patterns
+## Amendment A: (IHP) RSB Import Hierarchy Patterns
 
 **Added**: 2025-09-07  
 **Context**: Clarification based on ProntoDB project implementation experience
@@ -976,3 +980,35 @@ This pattern reduces boilerplate while maintaining RSB's string-first philosophy
 
 ---
 *RSB Architecture Framework - Amendment A*
+
+
+
+---
+
+## Amendment B: (PAM) RSB Pro-Active Maturation
+
+**Added**: 2025-09-08  
+**Context**: Clarification based on ProntoDB project implementation experience
+
+Sometimes defects/bugs in the young RSB Framework may surface while we are still testing and maturing the features. To help us resolve and mitigate these issues, a project is required to create a defect file in the project root `.rsb-defects` to keep a list of all defects encountered.
+
+The presence of this file provides a caveat for RSB non-compliance for known or unresolved defects, the particular api and use-case must be listed, and the particular version of rsb being used when discovered.
+
+
+## Amendment C: (LAU) Library vs Application Usage
+
+**Added**: 2025-09-08  
+**Context**: Libraries and Abstractions
+
+Some patterns of RSB don't make sense for *certain* contexts, for example a low-level library, colleciton of helper functions, abstracting macros, and certain types and traits, often times *require*  complex Rust patterns to provide a graceful interface for the end-user. In cases like this, the act of creating a library or abstraction layer via macros and other patterns *is* the very essence of Rebel/RSB, and so while the code itself may be "complex", the practice of serving and welcoming users through approachable interfaces excuses any necessary verbosity driving its implementation. The goal with RSB isnt absolution or purity, in fact architectural -ities like flexibilty, interoperabilty, and modularity supercede any exactness especially when it helps deliver Rebel's design.
+
+
+## Amendment D: (ECP)  Eventual Compliance Paradigm
+
+**Added**: 2025-09-08  
+**Context**: Specific Project Needs Progressive Compliance
+
+Legacy systems, external dependencies, and stakeholder constraints are among some of the development complexities that can make it *unreasonable* to demand 100% compliance at every stage of delivery. With this in mind, the notion of eventual compliance is a reasonable compromise towards a project who's goal is true RSB alignment. To enact this provision, a project must note its eventual compliance needs in a `.rsb-compliance` note listing on each one line, the exceptions they are invoking and why. This is a general purpose pattern that can handle the other ammendments as well when documentation of compliance needs or concerns is required. Helpful to note as well, why eventual compliance is necessary or what needs to happen in order to improve the level of compliance at its current stage of development. 
+
+IMPORTANT! If any exception to RSB compliance is invoked, but the protocol for invoking them is not implemented correctly (example missing .rsb-compliance or .rsb-defects note files), the reporter must advise them of this requirement, and allow them to correct the issue so they can remove or disregard any reported non-compliance blockers.
+

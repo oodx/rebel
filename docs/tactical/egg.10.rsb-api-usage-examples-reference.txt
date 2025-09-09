@@ -1,0 +1,377 @@
+RSB API USAGE EXAMPLES & QUICK REFERENCE
+========================================
+
+Date: 2025-09-08
+Target: RSB Framework API Examples & Usage Patterns
+Source: docs/RSB_COMPREHENSIVE_GUIDE.md, docs/RSB_FOUNDATION_ANALYSIS.md
+
+EXECUTIVE API SUMMARY
+======================
+
+RSB provides a comprehensive macro-based API that transforms complex Rust operations
+into familiar bash-like patterns. This reference covers all major API categories
+with practical examples for ProntoDB implementation.
+
+APPLICATION LIFECYCLE API
+==========================
+
+STANDARD RSB APPLICATION BOOTSTRAP:
+```rust
+fn main() {
+    // 1. Initialize environment and parse arguments
+    let args = bootstrap!();
+    
+    // 2. Handle early commands (before configuration)
+    pre_dispatch!(&args, {
+        "install" => do_install,
+        "uninstall" => do_uninstall,
+        "init" => do_init
+    });
+    
+    // 3. Load configuration files
+    src!("~/.local/etc/odx/prontodb/pronto.conf", "./pronto.conf");
+    
+    // 4. Main command dispatch
+    dispatch!(&args, {
+        "set" => do_set,
+        "get" => do_get,
+        "del" => do_delete,
+        "keys" => do_keys,
+        "scan" => do_scan,
+        "stream" => do_stream,
+        "projects" => do_projects,
+        "namespaces" => do_namespaces
+    });
+}
+```
+
+ARGUMENT PROCESSING EXAMPLES:
+```rust
+// Access command line arguments (RSB style)
+let command = args.get_or(0, "help");           // First argument or "help"
+let address = args.get_or(1, "");               // Second argument or empty
+let value = args.get_or(2, "");                 // Third argument or empty
+
+// Validate required arguments
+validate!(!address.is_empty(), "Address required: pronto set <address> <value>");
+validate!(!value.is_empty(), "Value required: pronto set <address> <value>");
+```
+
+STREAM PROCESSING API
+=====================
+
+STREAM CREATION (SOURCES):
+```rust
+// File input streams
+let log_data = cat!("access.log");
+let multiple_files = cat!("file1.txt", "file2.txt", "file3.txt");
+
+// Command output streams  
+let process_list = cmd!("ps aux");
+let disk_usage = cmd!("df -h");
+
+// String/variable streams
+let config_data = pipe!(config_string);
+let env_var = stream!(var: "PATH");
+
+// stdin stream
+let user_input = cat!("-");
+```
+
+STREAM OPERATIONS:
+```rust
+// Pattern matching and filtering
+let errors = cat!("application.log")
+    .grep("ERROR")                              // Find error lines
+    .grep(r"\d{4}-\d{2}-\d{2}")                 // With date patterns
+    .filter(|line| !line.contains("DEBUG"));    // Exclude debug info
+
+// String manipulation
+let cleaned_data = cat!("data.csv")
+    .sed("old_value", "new_value")              // Replace strings
+    .sed(r"\s+", " ")                           // Normalize whitespace
+    .cut(1, ",")                                // Extract first field
+    .sort()                                     // Sort lines
+    .unique();                                  // Remove duplicates
+
+// Line manipulation
+let recent_entries = cat!("events.log")
+    .tail(100)                                  // Last 100 lines
+    .head(50)                                   // First 50 of those
+    .tee("recent.log");                         // Copy to file and pass through
+```
+
+STREAM CONSUMPTION (SINKS):
+```rust
+// Convert to different formats
+let result_string = stream_data.to_string();    // Single string
+let result_lines = stream_data.to_vec();        // Vector of lines  
+let line_count = stream_data.count();           // Count lines
+
+// Output to files
+stream_data.to_file("output.txt");              // Write to file
+```
+
+PARAMETER EXPANSION API
+=======================
+
+BASIC VARIABLE OPERATIONS:
+```rust
+// Basic expansion (like $VAR)
+let home_dir = param!("HOME");
+let user_name = param!("USER");
+
+// Default values (like ${VAR:-default})
+let db_path = param!("PRONTO_DB_PATH", 
+                    default: format!("{}/.local/data/odx/prontodb/store.db", 
+                                   param!("HOME")));
+
+// Alternative values (like ${VAR:+alt})  
+let debug_flag = param!("DEBUG", alt: "--verbose");
+```
+
+STRING MANIPULATION:
+```rust
+// String length (like ${#VAR})
+let path_length = param!("PATH", len);
+
+// Substring extraction (like ${VAR:pos:len})
+let partial = param!("FULL_STRING", sub: 5, 10);  // Extract 10 chars from pos 5
+
+// Prefix removal (like ${VAR#prefix*})
+let filename = param!("FULL_PATH", prefix: "*/");
+
+// Suffix removal (like ${VAR%*.ext})
+let basename = param!("FILENAME", suffix: ".*");
+
+// String replacement (like ${VAR/old/new})
+let updated = param!("CONFIG", replace: "dev" => "prod");
+
+// Case conversion
+let uppercase = param!("name", upper);              // ${VAR^^}
+let lowercase = param!("NAME", lower);              // ${VAR,,}
+```
+
+VALIDATION & TESTING API
+=========================
+
+CONDITIONAL TESTS (bash-like [[...]]):
+```rust
+// File system tests
+if test!(-f "config.toml") {                    // File exists
+    println!("Config found");
+}
+
+if test!(-d "/var/log") {                       // Directory exists
+    println!("Log directory available");
+}
+
+if test!(-w "database.db") {                    // File writable
+    println!("Database writable");
+}
+
+// String tests
+if test!(-n user_input) {                       // String not empty
+    process_input(&user_input);
+}
+
+if test!(password, ==, confirm) {               // String equality
+    create_user(&user, &password);
+}
+
+if test!(email, =~, r".*@.*\..*") {             // Regex match
+    send_email(&email);
+}
+```
+
+VALIDATION MACROS (Exit on Failure):
+```rust
+// Input validation with custom messages
+validate!(!address.is_empty(), "Address cannot be empty");
+validate!(address.contains('.'), "Address must contain namespace delimiter");
+validate!(address.matches('.').count() >= 2, "Address format: project.namespace.key");
+
+// File/directory requirements
+require_file!("database.db", "Database not found - run 'pronto install'");
+require_dir!("~/.local/data/odx", "Data directory not initialized");
+
+// Command availability
+require_command!("sqlite3", "SQLite3 required but not found in PATH");
+
+// Environment variables
+require_var!("HOME", "HOME environment variable not set");
+```
+
+PRONTODB-SPECIFIC API EXAMPLES
+===============================
+
+ADDRESS PARSING WITH VALIDATION:
+```rust
+pub fn api_set(args: Args) -> i32 {
+    let address = args.get_or(1, "");
+    let value = args.get_or(2, "");
+    
+    // RSB validation macros
+    validate!(!address.is_empty(), "Usage: pronto set <address> <value>");
+    validate!(!value.is_empty(), "Usage: pronto set <address> <value>");
+    validate!(address.contains('.'), "Address format: project.namespace.key");
+    validate!(address.matches('.').count() >= 2, "Address format: project.namespace.key");
+    
+    // Delegate to helper tier
+    match _helper_set(&address, &value) {
+        Ok(result) => {
+            okay!("Set key: {}", address);
+            echo!("{}", result);    // stdout: data only
+            0
+        },
+        Err(error) => {
+            error!("Failed to set key: {}", error);
+            1
+        }
+    }
+}
+```
+
+STREAM-BASED KEY OPERATIONS:
+```rust
+pub fn api_keys(args: Args) -> i32 {
+    let pattern = args.get_or(1, "");
+    
+    if pattern.is_empty() {
+        // List all keys
+        let all_keys = _helper_list_keys()
+            .split('\n')
+            .collect::<Vec<&str>>()
+            .join("\n");
+        echo!("{}", all_keys);
+    } else {
+        // Filter keys with pattern
+        let matching_keys = _helper_list_keys()
+            .split('\n')
+            .filter(|key| key.contains(&pattern))
+            .collect::<Vec<&str>>()
+            .join("\n");
+        echo!("{}", matching_keys);
+    }
+    
+    0
+}
+```
+
+STREAM INPUT PROCESSING:
+```rust
+pub fn api_stream(args: Args) -> i32 {
+    // Read from stdin
+    let input_stream = cat!("-");
+    
+    // Process auth preamble
+    let auth_lines = input_stream
+        .grep("meta:sec:pass=")                 // Find auth lines
+        .head(1)                                // Take first match
+        .to_string();
+    
+    validate!(!auth_lines.is_empty(), "Authentication preamble required");
+    
+    // Process data lines
+    let data_lines = input_stream
+        .grep("^data:")                         // Find data lines
+        .sed("^data:", "")                      // Remove prefix
+        .to_vec();
+    
+    // Process each data line
+    for line in data_lines {
+        if let Some((key, value)) = line.split_once('=') {
+            match _helper_set(key, value) {
+                Ok(_) => info!("Processed: {}", key),
+                Err(e) => error!("Failed {}: {}", key, e),
+            }
+        }
+    }
+    
+    0
+}
+```
+
+CONFIGURATION LOADING:
+```rust
+fn _load_config() {
+    // RSB configuration loading with fallbacks
+    src!(
+        "~/.local/etc/odx/prontodb/pronto.conf",    // System config
+        "~/.config/prontodb/pronto.conf",           // User config  
+        "./pronto.conf"                             // Local config
+    );
+    
+    // Validate required configuration
+    require_var!("PRONTO_DB_PATH", "Database path not configured");
+    
+    // Set defaults for optional configuration
+    if param!("PRONTO_TTL_DEFAULT").is_empty() {
+        set_var("PRONTO_TTL_DEFAULT", "3600");      // 1 hour default
+    }
+}
+```
+
+ERROR COMMUNICATION PATTERNS:
+```rust
+// RSB communication discipline examples
+pub fn api_get(args: Args) -> i32 {
+    let address = args.get_or(1, "");
+    validate!(!address.is_empty(), "Usage: pronto get <address>");
+    
+    info!("Looking up key: {}", address);       // stderr: status
+    
+    match _helper_get(&address) {
+        Ok(Some(value)) => {
+            okay!("Found key");                 // stderr: success status
+            echo!("{}", value);                 // stdout: actual data
+            0                                   // exit: success
+        },
+        Ok(None) => {
+            warn!("Key not found: {}", address); // stderr: warning
+            2                                   // exit: miss
+        },
+        Err(error) => {
+            error!("Failed to get key: {}", error); // stderr: error
+            1                                   // exit: failure
+        }
+    }
+}
+```
+
+LOG PROCESSING EXAMPLE:
+```rust
+pub fn analyze_logs(log_file: &str) -> String {
+    cat!(log_file)
+        .grep("ERROR")                          // Find error lines
+        .grep(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}") // With timestamps
+        .cut(3, " ")                            // Extract error message field
+        .sort()                                 // Sort by message
+        .unique()                               // Remove duplicates
+        .head(10)                               // Top 10 unique errors
+        .to_string()                            // Convert to result
+}
+```
+
+🐔 Summary Status: COMPREHENSIVE API REFERENCE
+This egg provides practical RSB API usage examples specifically tailored for ProntoDB implementation patterns.
+
+QUICK LOOKUP SUMMARY
+====================
+
+• bootstrap!() - Initialize application context
+• dispatch!() - Route commands to handlers  
+• cat!() - Create file/stdin streams
+• grep() - Filter stream content
+• sed() - Transform stream content  
+• param!() - Environment variable expansion
+• validate!() - Input validation with exit
+• test!() - Conditional testing
+• info!() / error!() / okay!() - stderr communication
+• echo!() - stdout data output
+
+DISCLAIMER
+----------
+⚠️ This API reference reflects documented RSB framework capabilities.
+Actual macro availability may depend on RSB framework version and configuration.
+Test API availability during implementation phases.
